@@ -13,6 +13,7 @@ import {
 } from "@/lib/types";
 import { ChevronLeftIcon, TrashIcon } from "@/components/icons";
 import { Listbox } from "@/components/Listbox";
+import { AjoutCategorieRapide } from "@/components/AjoutCategorieRapide";
 
 const OPTIONS_LIVRAISON = [
   { value: "physique", label: "Physique" },
@@ -228,6 +229,15 @@ export function EditionProduit({ id }: { id: string }) {
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-brand-muted">Catégorie</label>
               <Listbox value={categorieId} onChange={setCategorieId} options={categories.map((c) => ({ value: String(c.id), label: c.nom_categorie }))} />
+              {estAdminProduit ? (
+                <AjoutCategorieRapide
+                  token={token}
+                  onCreee={(categorie) => {
+                    setCategories((liste) => [...liste, categorie]);
+                    setCategorieId(String(categorie.id));
+                  }}
+                />
+              ) : null}
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-brand-muted">Type de livraison</label>

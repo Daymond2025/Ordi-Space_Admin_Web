@@ -48,7 +48,11 @@ export function QuestionForm({ existant }: { existant?: QuestionFrequente }) {
       }
       router.push("/clients/assistance");
     } catch (e) {
-      setErreur(e instanceof ApiRequestError ? e.message : "Impossible d'enregistrer cette question.");
+      if (e instanceof ApiRequestError && e.fields) {
+        setErreur(Object.values(e.fields).flat().join(" "));
+      } else {
+        setErreur(e instanceof ApiRequestError ? e.message : "Impossible d'enregistrer cette question.");
+      }
     } finally {
       setChargement(false);
     }

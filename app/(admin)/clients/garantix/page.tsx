@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formaterPrix, type ExclusionGarantix, type FormuleGarantix } from "@/lib/types";
-import { MaintenanceServiceIcon, PlusIcon, TrashIcon } from "@/components/icons";
+import { MaintenanceServiceIcon, PencilIcon, PlusIcon, TrashIcon } from "@/components/icons";
 import { PageHero } from "@/components/PageHero";
 
 type BrouillonFormule = {
@@ -36,6 +36,9 @@ export default function GarantixPage() {
   const [nouvellesPrestations, setNouvellesPrestations] = useState<Record<number, string>>({});
   const [nouvelleExclusion, setNouvelleExclusion] = useState("");
   const [chargement, setChargement] = useState(false);
+  const [formuleEnEditionId, setFormuleEnEditionId] = useState<number | null>(null);
+  const [brouillonEdition, setBrouillonEdition] = useState<BrouillonFormule>(BROUILLON_VIDE);
+  const [chargementEdition, setChargementEdition] = useState(false);
 
   function recharger() {
     if (!token) return;
@@ -69,6 +72,45 @@ export default function GarantixPage() {
       setErreur(e instanceof ApiRequestError ? e.message : "Impossible de créer cette formule.");
     } finally {
       setChargement(false);
+    }
+  }
+
+  function ouvrirEdition(formule: FormuleGarantix) {
+    setErreur(null);
+    setFormuleEnEditionId(formule.id);
+    setBrouillonEdition({
+      nom: formule.nom,
+      libelle_complet: formule.libelle_complet,
+      libelle_badge: formule.libelle_badge ?? "",
+      prix_annuel: String(formule.prix_annuel),
+      frequence_interventions: String(formule.frequence_interventions),
+      description: formule.description ?? "",
+    });
+  }
+
+  async function enregistrerEdition(formuleId: number) {
+    if (!token) return;
+    setErreur(null);
+    setChargementEdition(true);
+
+    try {
+      await apiFetch(`/garantix/formules/${formuleId}`, {
+        method: "PUT",
+        token,
+        body: {
+          ...brouillonEdition,
+          libelle_badge: brouillonEdition.libelle_badge || null,
+          description: brouillonEdition.description || null,
+          prix_annuel: Number(brouillonEdition.prix_annuel),
+          frequence_interventions: Number(brouillonEdition.frequence_interventions),
+        },
+      });
+      setFormuleEnEditionId(null);
+      recharger();
+    } catch (e) {
+      setErreur(e instanceof ApiRequestError ? e.message : "Impossible de modifier cette formule.");
+    } finally {
+      setChargementEdition(false);
     }
   }
 
@@ -186,16 +228,81 @@ export default function GarantixPage() {
         {formules === null ? (
           <p className="col-span-3 text-center text-sm text-brand-muted">Chargement…</p>
         ) : (
-          formules.map((formule) => (
+          formules.map((formule) =>
+            formuleEnEditionId === formule.id ? (
+              <div key={formule.id} className="flex flex-col gap-3 rounded-2xl border border-[color:var(--brand-blue-end)] bg-white p-5">
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    placeholder="Nom (ex: essentielle)"
+                    value={brouillonEdition.nom}
+                    onChange={(e) => setBrouillonEdition({ ...brouillonEdition, nom: e.target.value })}
+                    className="h-10 rounded-xl border border-brand-line px-3 text-xs"
+                  />
+                  <input
+                    placeholder="Libellé complet"
+                    value={brouillonEdition.libelle_complet}
+                    onChange={(e) => setBrouillonEdition({ ...brouillonEdition, libelle_complet: e.target.value })}
+                    className="h-10 rounded-xl border border-brand-line px-3 text-xs"
+                  />
+                  <input
+                    placeholder="Badge (optionnel)"
+                    value={brouillonEdition.libelle_badge}
+                    onChange={(e) => setBrouillonEdition({ ...brouillonEdition, libelle_badge: e.target.value })}
+                    className="h-10 rounded-xl border border-brand-line px-3 text-xs"
+                  />
+                  <input
+                    type="number"
+                    min="0"
+                    placeholder="Prix annuel (CFA)"
+                    value={brouillonEdition.prix_annuel}
+                    onChange={(e) => setBrouillonEdition({ ...brouillonEdition, prix_annuel: e.target.value })}
+                    className="h-10 rounded-xl border border-brand-line px-3 text-xs"
+                  />
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Fréquence d'interventions"
+                    value={brouillonEdition.frequence_interventions}
+                    onChange={(e) => setBrouillonEdition({ ...brouillonEdition, frequence_interventions: e.target.value })}
+                    className="h-10 rounded-xl border border-brand-line px-3 text-xs"
+                  />
+                </div>
+                <textarea
+                  placeholder="Description"
+                  value={brouillonEdition.description}
+                  onChange={(e) => setBrouillonEdition({ ...brouillonEdition, description: e.target.value })}
+                  rows={2}
+                  className="rounded-xl border border-brand-line px-3 py-2 text-xs"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => enregistrerEdition(formule.id)}
+                    disabled={chargementEdition}
+                    className="h-9 rounded-full bg-brand-ink px-4 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    {chargementEdition ? "Enregistrement…" : "Enregistrer"}
+                  </button>
+                  <button type="button" onClick={() => setFormuleEnEditionId(null)} className="h-9 rounded-full px-4 text-xs font-semibold text-brand-muted">
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            ) : (
             <div key={formule.id} className="flex flex-col gap-3 rounded-2xl border border-brand-line bg-white p-5">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm font-bold text-brand-ink">{formule.libelle_complet}</p>
                   {formule.libelle_badge ? <p className="text-[11px] text-[color:var(--brand-blue-end)]">{formule.libelle_badge}</p> : null}
                 </div>
-                <button type="button" onClick={() => supprimerFormule(formule)} className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-line text-brand-muted">
-                  <TrashIcon className="h-3.5 w-3.5" />
-                </button>
+                <div className="flex shrink-0 gap-1.5">
+                  <button type="button" onClick={() => ouvrirEdition(formule)} className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-line text-brand-muted">
+                    <PencilIcon className="h-3.5 w-3.5" />
+                  </button>
+                  <button type="button" onClick={() => supprimerFormule(formule)} className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-line text-brand-muted">
+                    <TrashIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
               </div>
 
               <p className="text-xl font-extrabold text-brand-ink">{formaterPrix(formule.prix_annuel)} CFA / an</p>

@@ -7,6 +7,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import type { Categorie, Produit } from "@/lib/types";
 import { ChevronLeftIcon } from "@/components/icons";
 import { Listbox } from "@/components/Listbox";
+import { AjoutCategorieRapide } from "@/components/AjoutCategorieRapide";
 
 const OPTIONS_LIVRAISON = [
   { value: "physique", label: "Physique" },
@@ -86,6 +87,13 @@ export default function NouveauProduitPage() {
               onChange={setCategorieId}
               placeholder="Choisir…"
               options={categories.map((c) => ({ value: String(c.id), label: c.nom_categorie }))}
+            />
+            <AjoutCategorieRapide
+              token={token}
+              onCreee={(categorie) => {
+                setCategories((liste) => [...liste, categorie]);
+                setCategorieId(String(categorie.id));
+              }}
             />
           </div>
 

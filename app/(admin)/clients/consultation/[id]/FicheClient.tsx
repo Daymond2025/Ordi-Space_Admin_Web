@@ -24,6 +24,8 @@ import {
   STYLE_STATUT_COMPTE,
   STYLE_STATUT_DEMANDE_SAV,
   type FicheClient as FicheClientType,
+  type Pagination,
+  type Produit,
 } from "@/lib/types";
 import {
   BagIcon,
@@ -40,6 +42,7 @@ import {
   MailIcon,
   MaintenanceServiceIcon,
   PhoneIcon,
+  PlusIcon,
   SettingsIcon,
   ShieldCheckIcon,
   TicketIcon,
@@ -47,6 +50,7 @@ import {
   WhatsAppIcon,
   XIcon,
 } from "@/components/icons";
+import { Listbox } from "@/components/Listbox";
 
 const ONGLETS = ["Activités", "Commandes", "Panier", "Maintenance", "Privilèges", "Garanties", "Formation", "Profil"] as const;
 type Onglet = (typeof ONGLETS)[number];
@@ -178,12 +182,78 @@ export function FicheClient({ id }: { id: string }) {
   const [envoiEnCours, setEnvoiEnCours] = useState(false);
   const [notifEnvoyee, setNotifEnvoyee] = useState(false);
 
+  const [achatOuvert, setAchatOuvert] = useState(false);
+  const [produitsVendables, setProduitsVendables] = useState<Produit[] | null>(null);
+  const [produitChoisiId, setProduitChoisiId] = useState("");
+  const [quantiteAchat, setQuantiteAchat] = useState("1");
+  const [enregistrementEnCours, setEnregistrementEnCours] = useState(false);
+  const [achatEnregistre, setAchatEnregistre] = useState(false);
+
   useEffect(() => {
     if (!token) return;
     apiFetch<FicheClientType>(`/admin/clients/${id}`, { token })
       .then(setFiche)
       .catch(() => setFiche(null));
   }, [token, id]);
+
+  function ouvrirAchat() {
+    setErreur(null);
+    setAchatOuvert(true);
+    if (!produitsVendables && token) {
+      apiFetch<Pagination<Produit>>("/produits?per_page=100", { token }).then((page) => {
+        const liste = page.data.filter((p) => p.statut_produit === "valide" && p.type_livraison === "physique");
+        setProduitsVendables(liste);
+        setProduitChoisiId(liste[0] ? String(liste[0].id) : "");
+      });
+    }
+  }
+
+  /**
+   * Enregistre une vente déjà effectuée (achat en boutique physique, avant
+   * l'inscription du client sur l'appli) : crée la commande pour le compte
+   * du client puis la passe directement à "livrée", ce qui déclenche la
+   * génération de la garantie — même mécanisme que pour une vraie livraison
+   * (Garantie::genererPourCommande, cf. Admin\CommandeController::changerStatut).
+   */
+  async function enregistrerAchat() {
+    if (!token || !produitChoisiId || !fiche) return;
+
+    const adresseId = fiche.profil.adresses[0]?.id;
+    if (!adresseId) {
+      setErreur("Ce client n'a aucune adresse enregistrée — ajoutez-en une (via l'app cliente ou son compte) avant d'enregistrer un achat physique.");
+      return;
+    }
+
+    setErreur(null);
+    setEnregistrementEnCours(true);
+
+    try {
+      const commande = await apiFetch<{ id: number }>("/commandes", {
+        method: "POST",
+        token,
+        body: {
+          client_id: Number(id),
+          adresse_id: adresseId,
+          lignes: [{ produit_id: Number(produitChoisiId), quantite: Number(quantiteAchat) || 1 }],
+        },
+      });
+
+      await apiFetch(`/admin/commandes/${commande.id}/statut`, {
+        method: "PATCH",
+        token,
+        body: { statut_commande: "livree" },
+      });
+
+      setAchatOuvert(false);
+      setAchatEnregistre(true);
+      setTimeout(() => setAchatEnregistre(false), 2500);
+      apiFetch<FicheClientType>(`/admin/clients/${id}`, { token }).then(setFiche);
+    } catch (e) {
+      setErreur(e instanceof ApiRequestError ? e.message : "Impossible d'enregistrer cet achat.");
+    } finally {
+      setEnregistrementEnCours(false);
+    }
+  }
 
   async function envoyerNotification() {
     if (!token || !contenuNotif.trim()) return;
@@ -260,6 +330,15 @@ export function FicheClient({ id }: { id: string }) {
             <div className="flex items-center gap-2">
               <button
                 type="button"
+                onClick={() => (achatOuvert ? setAchatOuvert(false) : ouvrirAchat())}
+                style={{ background: "linear-gradient(135deg, #4fa6fe 0%, #1d63e0 100%)" }}
+                className="flex h-[33px] w-[150px] items-center justify-center gap-1.5 rounded-full text-xs font-semibold text-white"
+              >
+                <PlusIcon className="h-3.5 w-3.5" />
+                Enregistrer un achat
+              </button>
+              <button
+                type="button"
                 onClick={() => setNotifOuverte((v) => !v)}
                 style={{ background: "linear-gradient(289.44deg, #FFA200 7.05%, #FF3801 92.85%)" }}
                 className="flex h-[33px] w-[124px] items-center justify-center gap-1.5 rounded-full text-xs font-semibold text-white"
@@ -314,6 +393,52 @@ export function FicheClient({ id }: { id: string }) {
               </div>
             ) : null}
             {notifEnvoyee ? <p className="text-[11px] font-medium text-emerald-600">Notification envoyée ✓</p> : null}
+
+            {achatOuvert ? (
+              <div className="mt-1 w-80 rounded-2xl border border-brand-line bg-white p-3 shadow-lg">
+                <p className="mb-2 text-xs font-semibold text-brand-ink">
+                  Enregistrer un achat déjà effectué (ex. vente en boutique)
+                </p>
+                {produitsVendables === null ? (
+                  <p className="text-xs text-brand-muted">Chargement des produits…</p>
+                ) : produitsVendables.length === 0 ? (
+                  <p className="text-xs text-brand-muted">Aucun ordinateur disponible à la vente pour l&apos;instant.</p>
+                ) : (
+                  <div className="flex flex-col gap-2">
+                    <Listbox
+                      value={produitChoisiId}
+                      onChange={setProduitChoisiId}
+                      options={produitsVendables.map((p) => ({
+                        value: String(p.id),
+                        label: `${p.nom_produit} — ${formaterPrix(p.prix)} CFA`,
+                      }))}
+                    />
+                    <input
+                      type="number"
+                      min="1"
+                      value={quantiteAchat}
+                      onChange={(e) => setQuantiteAchat(e.target.value)}
+                      placeholder="Quantité"
+                      className="h-9 rounded-xl border border-brand-line px-2.5 text-xs outline-none focus:border-[color:var(--brand-blue-end)]"
+                    />
+                  </div>
+                )}
+                <div className="mt-2 flex justify-end gap-2">
+                  <button type="button" onClick={() => setAchatOuvert(false)} className="rounded-full px-3 py-1.5 text-xs font-semibold text-brand-muted">
+                    Annuler
+                  </button>
+                  <button
+                    type="button"
+                    onClick={enregistrerAchat}
+                    disabled={enregistrementEnCours || !produitChoisiId}
+                    className="rounded-full bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    {enregistrementEnCours ? "Enregistrement…" : "Enregistrer"}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+            {achatEnregistre ? <p className="text-[11px] font-medium text-emerald-600">Achat enregistré ✓ — garantie activée</p> : null}
           </div>
         </div>
 
