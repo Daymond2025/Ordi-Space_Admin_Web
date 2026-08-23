@@ -23,6 +23,7 @@ import {
   STYLE_STATUT_COMMANDE,
   STYLE_STATUT_COMPTE,
   STYLE_STATUT_DEMANDE_SAV,
+  type AbonnementGarantixDetail,
   type FicheClient as FicheClientType,
   type Pagination,
   type Produit,
@@ -189,12 +190,14 @@ export function FicheClient({ id }: { id: string }) {
   const [enregistrementEnCours, setEnregistrementEnCours] = useState(false);
   const [achatEnregistre, setAchatEnregistre] = useState(false);
 
-  useEffect(() => {
+  function rechargerFiche() {
     if (!token) return;
     apiFetch<FicheClientType>(`/admin/clients/${id}`, { token })
       .then(setFiche)
       .catch(() => setFiche(null));
-  }, [token, id]);
+  }
+
+  useEffect(rechargerFiche, [token, id]);
 
   function ouvrirAchat() {
     setErreur(null);
@@ -475,7 +478,7 @@ export function FicheClient({ id }: { id: string }) {
           {onglet === "Panier" ? <OngletPanier fiche={fiche} /> : null}
           {onglet === "Maintenance" ? <OngletMaintenance fiche={fiche} /> : null}
           {onglet === "Privilèges" ? <OngletPrivileges fiche={fiche} /> : null}
-          {onglet === "Garanties" ? <OngletGaranties fiche={fiche} /> : null}
+          {onglet === "Garanties" ? <OngletGaranties fiche={fiche} token={token} onRafraichir={rechargerFiche} /> : null}
           {onglet === "Formation" ? <OngletFormation fiche={fiche} /> : null}
           {onglet === "Profil" ? <OngletProfil fiche={fiche} /> : null}
         </div>
@@ -804,14 +807,99 @@ function ImageProduitMini({ images }: { images?: { url_image: string }[] }) {
   );
 }
 
-function OngletGaranties({ fiche }: { fiche: FicheClientType }) {
+const LIBELLE_MODE_PAIEMENT_GARANTIX: Record<string, string> = {
+  mobile_money: "Mobile Money",
+  especes: "Espèces",
+};
+
+function OngletGaranties({
+  fiche,
+  token,
+  onRafraichir,
+}: {
+  fiche: FicheClientType;
+  token: string | null;
+  onRafraichir: () => void;
+}) {
   const { garanties, abonnements_garantix } = fiche.garanties;
+  const [enCoursId, setEnCoursId] = useState<number | null>(null);
+  const [erreurPaiement, setErreurPaiement] = useState<string | null>(null);
+
+  const enAttente = abonnements_garantix.filter((a) => a.statut_paiement === "en_attente");
+
+  async function confirmerPaiement(abonnement: AbonnementGarantixDetail) {
+    if (!token) return;
+    setErreurPaiement(null);
+    setEnCoursId(abonnement.id);
+    try {
+      await apiFetch(`/garantix/abonnements/${abonnement.id}/confirmer-paiement`, { method: "PATCH", token });
+      onRafraichir();
+    } catch (e) {
+      setErreurPaiement(e instanceof ApiRequestError ? e.message : "Impossible de confirmer ce paiement.");
+    } finally {
+      setEnCoursId(null);
+    }
+  }
+
+  async function rejeterPaiement(abonnement: AbonnementGarantixDetail) {
+    if (!token || !confirm("Rejeter cette demande d'activation GarantiX ?")) return;
+    setErreurPaiement(null);
+    setEnCoursId(abonnement.id);
+    try {
+      await apiFetch(`/garantix/abonnements/${abonnement.id}/rejeter-paiement`, { method: "PATCH", token });
+      onRafraichir();
+    } catch (e) {
+      setErreurPaiement(e instanceof ApiRequestError ? e.message : "Impossible de rejeter cette demande.");
+    } finally {
+      setEnCoursId(null);
+    }
+  }
+
   if (garanties.length === 0 && abonnements_garantix.length === 0) {
     return <VideEtat message="Aucune garantie ni abonnement GarantiX pour ce client." />;
   }
 
   return (
     <div className="flex flex-col gap-5">
+      {erreurPaiement ? <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{erreurPaiement}</p> : null}
+
+      {enAttente.length > 0 ? (
+        <div>
+          <p className="mb-3 text-sm font-bold text-brand-ink">Demandes d&apos;activation en attente ({enAttente.length})</p>
+          <div className="flex flex-col gap-3">
+            {enAttente.map((a) => (
+              <div key={a.id} className="flex flex-wrap items-center gap-4 rounded-2xl border border-amber-200 bg-amber-50/60 p-4">
+                {a.ligne_commande ? <ImageProduitMini images={a.ligne_commande.produit.images} /> : null}
+                <div className="min-w-0 flex-1 basis-40">
+                  <p className="truncate text-sm font-bold text-brand-ink">{a.formule.libelle_complet}</p>
+                  <p className="mt-0.5 text-xs text-brand-muted">
+                    {a.ligne_commande?.produit.nom_produit ?? "—"} · Paiement déclaré : {LIBELLE_MODE_PAIEMENT_GARANTIX[a.mode_paiement] ?? a.mode_paiement}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => rejeterPaiement(a)}
+                    disabled={enCoursId === a.id}
+                    className="h-8 rounded-full bg-white px-3 text-xs font-semibold text-rose-600 shadow-sm disabled:opacity-50"
+                  >
+                    Rejeter
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => confirmerPaiement(a)}
+                    disabled={enCoursId === a.id}
+                    className="h-8 rounded-full bg-emerald-600 px-3 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    {enCoursId === a.id ? "…" : "Confirmer le paiement"}
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
       {garanties.length > 0 ? (
         <div>
           <p className="mb-3 text-sm font-bold text-brand-ink">Garantie de base ({garanties.length})</p>
@@ -843,28 +931,37 @@ function OngletGaranties({ fiche }: { fiche: FicheClientType }) {
         </div>
       ) : null}
 
-      {abonnements_garantix.length > 0 ? (
+      {abonnements_garantix.filter((a) => a.statut_paiement !== "en_attente").length > 0 ? (
         <div>
-          <p className="mb-3 text-sm font-bold text-brand-ink">Abonnements GarantiX ({abonnements_garantix.length})</p>
+          <p className="mb-3 text-sm font-bold text-brand-ink">
+            Abonnements GarantiX ({abonnements_garantix.filter((a) => a.statut_paiement !== "en_attente").length})
+          </p>
           <div className="flex flex-col gap-3">
-            {abonnements_garantix.map((a) => (
-              <div key={a.id} className="flex flex-wrap items-center gap-4 rounded-2xl border border-brand-line bg-white p-4">
-                {a.ligne_commande ? <ImageProduitMini images={a.ligne_commande.produit.images} /> : null}
-                <div className="min-w-0 flex-1 basis-40">
-                  <p className="truncate text-sm font-bold text-brand-ink">{a.formule.libelle_complet}</p>
-                  <p className="mt-0.5 text-xs text-brand-muted">
-                    {a.ligne_commande?.produit.nom_produit ?? "—"} · {a.interventions_utilisees}/{a.formule.frequence_interventions} interventions utilisées
-                  </p>
-                </div>
-                <span
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
-                    a.statut === "actif" ? "bg-emerald-100 text-emerald-600" : "bg-brand-line text-brand-muted"
-                  }`}
-                >
-                  {a.statut === "actif" ? "Actif" : a.statut}
-                </span>
-              </div>
-            ))}
+            {abonnements_garantix
+              .filter((a) => a.statut_paiement !== "en_attente")
+              .map((a) => {
+                const actif = a.statut === "actif" && a.statut_paiement === "confirme";
+                const libelleStatut = actif ? "Actif" : a.statut_paiement === "echoue" ? "Paiement rejeté" : a.statut;
+
+                return (
+                  <div key={a.id} className="flex flex-wrap items-center gap-4 rounded-2xl border border-brand-line bg-white p-4">
+                    {a.ligne_commande ? <ImageProduitMini images={a.ligne_commande.produit.images} /> : null}
+                    <div className="min-w-0 flex-1 basis-40">
+                      <p className="truncate text-sm font-bold text-brand-ink">{a.formule.libelle_complet}</p>
+                      <p className="mt-0.5 text-xs text-brand-muted">
+                        {a.ligne_commande?.produit.nom_produit ?? "—"} · {a.interventions_utilisees}/{a.formule.frequence_interventions} interventions utilisées
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                        actif ? "bg-emerald-100 text-emerald-600" : "bg-brand-line text-brand-muted"
+                      }`}
+                    >
+                      {libelleStatut}
+                    </span>
+                  </div>
+                );
+              })}
           </div>
         </div>
       ) : null}

@@ -536,6 +536,8 @@ export type CommandeDetailAdmin = {
   lignes: LigneCommandeDetail[];
   livraison: LivraisonDetail | null;
   paiement: PaiementDetail | null;
+  privilege: { id: number; titre: string; type_privilege: string; code_promo: string | null } | null;
+  parrain: { user_id: number; user: PersonneCommande } | null;
 };
 
 export const LIBELLE_STATUT_LIVRAISON: Record<string, string> = {
@@ -584,6 +586,8 @@ export type AbonnementGarantixDetail = {
   date_debut: string;
   date_fin: string;
   statut: string;
+  statut_paiement: "en_attente" | "confirme" | "echoue";
+  mode_paiement: "mobile_money" | "especes";
   interventions_utilisees: number;
   formule: FormuleGarantix;
   ligne_commande: { produit: Produit } | null;

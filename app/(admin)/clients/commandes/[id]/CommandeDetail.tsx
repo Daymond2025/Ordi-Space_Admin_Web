@@ -245,6 +245,30 @@ export function CommandeDetail({ id }: { id: string }) {
             );
           })}
         </div>
+
+        <div className="mt-4 flex flex-col gap-1.5 border-t border-brand-line pt-4 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-brand-muted">Montant total</span>
+            <span className="font-semibold text-brand-ink">{formaterPrix(commande.montant_total)} CFA</span>
+          </div>
+          {Number(commande.montant_remise) > 0 ? (
+            <div className="flex items-center justify-between">
+              <span className="text-brand-muted">
+                Remise appliquée
+                {commande.privilege ? ` (${commande.privilege.titre}${commande.privilege.code_promo ? ` — ${commande.privilege.code_promo}` : ""})` : ""}
+              </span>
+              <span className="font-semibold text-emerald-600">-{formaterPrix(commande.montant_remise)} CFA</span>
+            </div>
+          ) : null}
+          {commande.parrain ? (
+            <div className="flex items-center justify-between">
+              <span className="text-brand-muted">Parrainage</span>
+              <span className="font-semibold text-brand-ink">
+                Filleul de {nomComplet(commande.parrain.user)}
+              </span>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="rounded-3xl border border-brand-line bg-white p-6 shadow-none">

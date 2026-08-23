@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
     remotePatterns: [
       { protocol: "http", hostname: "localhost", port: "8000", pathname: "/storage/**" },
       { protocol: "http", hostname: "127.0.0.1", port: "8000", pathname: "/storage/**" },
+      { protocol: "https", hostname: "ordisapce.daymondboutique.com", pathname: "/storage/**" },
       { protocol: "https", hostname: "i.ytimg.com" },
     ],
     // Backend API tourne en local en développement (127.0.0.1 / localhost) :
