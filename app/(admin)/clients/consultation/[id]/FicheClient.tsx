@@ -109,6 +109,25 @@ function normaliserTelephone(telephone: string): string {
   return telephone.replace(/[^\d]/g, "");
 }
 
+/**
+ * Lien d'accès à l'espace client (connexion par téléphone) — le numéro est
+ * préfiltré, le client n'a plus qu'à valider le code OTP reçu par WhatsApp.
+ * Voir Ordi'Space_App_Mobile: FormulaireConnexion (lit ?telephone=).
+ */
+function lienEspaceClient(telephone: string): string {
+  const base = process.env.NEXT_PUBLIC_CLIENT_APP_URL ?? "http://localhost:3000";
+
+  return `${base}/connexion?telephone=${encodeURIComponent(telephone)}`;
+}
+
+function lienWhatsappInvitation(telephone: string, prenom: string | null): string {
+  const message = `Bonjour ${prenom ?? ""}, voici votre lien pour accéder à votre espace OrdiSpace : ${lienEspaceClient(telephone)}`
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return `https://wa.me/${normaliserTelephone(telephone)}?text=${encodeURIComponent(message)}`;
+}
+
 type OptionFiltre = { value: string; label: string };
 
 function FiltrePill({
@@ -198,6 +217,13 @@ export function FicheClient({ id }: { id: string }) {
   }
 
   useEffect(rechargerFiche, [token, id]);
+
+  // Enchaînement direct après création d'un nouveau client (clients/liste) :
+  // on ouvre tout de suite le panneau d'enregistrement d'achat.
+  useEffect(() => {
+    if (searchParams.get("ouvrir_achat") === "1") ouvrirAchat();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   function ouvrirAchat() {
     setErreur(null);
@@ -350,7 +376,7 @@ export function FicheClient({ id }: { id: string }) {
                 Notification
               </button>
               <a
-                href={telephone ? `https://wa.me/${normaliserTelephone(telephone)}` : undefined}
+                href={telephone ? lienWhatsappInvitation(telephone, profil.user.prenom) : undefined}
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-disabled={!telephone}
@@ -1054,7 +1080,7 @@ function OngletProfil({ fiche }: { fiche: FicheClientType }) {
           icone={UserAvatarIcon}
           couleur="bg-blue-50 text-[color:var(--brand-blue-end)]"
         />
-        <ChampProfil label="Email" valeur={profil.user.email} icone={MailIcon} couleur="bg-violet-50 text-violet-500" />
+        <ChampProfil label="Email" valeur={profil.user.email ?? "—"} icone={MailIcon} couleur="bg-violet-50 text-violet-500" />
         <ChampProfil label="Téléphone" valeur={profil.user.telephone ?? "—"} icone={PhoneIcon} couleur="bg-emerald-50 text-emerald-500" />
         <ChampProfil label="Membre depuis" valeur={formaterDate(profil.date_inscription)} icone={CalendarIcon} couleur="bg-orange-50 text-orange-500" />
         <ChampProfil label="Code de parrainage" valeur={profil.code_parrainage} icone={TicketIcon} couleur="bg-rose-50 text-rose-500" />

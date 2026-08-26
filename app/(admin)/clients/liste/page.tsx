@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, apiFetchAvecMeta, ApiRequestError } from "@/lib/api";
@@ -89,12 +90,18 @@ function ChampFormulaire({ ...props }: React.InputHTMLAttributes<HTMLInputElemen
   );
 }
 
-function ModaleNouveauClient({ token, onClose, onCree }: { token: string; onClose: () => void; onCree: () => void }) {
+/**
+ * Le Client s'authentifie désormais par téléphone (WhatsApp + OTP) — plus
+ * d'e-mail/mot de passe (voir Api\Auth\TelephoneAuthController côté
+ * backend). Cette modale ne fait donc que créer l'identité minimale
+ * (nom + téléphone) via /clients/creation-rapide, exactement comme un
+ * commercial enregistrant une vente pour un nouveau client — l'admin est
+ * ensuite redirigé vers la fiche du client pour y enregistrer son achat.
+ */
+function ModaleNouveauClient({ token, onClose, onCree }: { token: string; onClose: () => void; onCree: (clientId: number) => void }) {
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
-  const [email, setEmail] = useState("");
   const [telephone, setTelephone] = useState("");
-  const [password, setPassword] = useState("");
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
 
@@ -102,19 +109,12 @@ function ModaleNouveauClient({ token, onClose, onCree }: { token: string; onClos
     setErreur(null);
     setEnCours(true);
     try {
-      await apiFetch("/admin/utilisateurs", {
+      const client = await apiFetch<{ id: number }>("/clients/creation-rapide", {
         method: "POST",
         token,
-        body: {
-          nom,
-          prenom: prenom || null,
-          email,
-          telephone: telephone || null,
-          password,
-          type_utilisateur: "client",
-        },
+        body: { nom, prenom: prenom || null, telephone },
       });
-      onCree();
+      onCree(client.id);
     } catch (e) {
       setErreur(e instanceof ApiRequestError ? e.message : "Impossible de créer ce client.");
     } finally {
@@ -132,6 +132,10 @@ function ModaleNouveauClient({ token, onClose, onCree }: { token: string; onClos
           </button>
         </div>
 
+        <p className="mt-2 text-xs text-brand-muted">
+          Le client active son espace lui-même via son numéro WhatsApp (code de vérification) — aucun mot de passe à définir ici.
+        </p>
+
         {erreur ? <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-600">{erreur}</p> : null}
 
         <div className="mt-4 flex flex-col gap-3">
@@ -139,20 +143,13 @@ function ModaleNouveauClient({ token, onClose, onCree }: { token: string; onClos
             <ChampFormulaire value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom" />
             <ChampFormulaire value={prenom} onChange={(e) => setPrenom(e.target.value)} placeholder="Prénom (optionnel)" />
           </div>
-          <ChampFormulaire value={email} onChange={(e) => setEmail(e.target.value)} type="email" placeholder="Email" />
-          <ChampFormulaire value={telephone} onChange={(e) => setTelephone(e.target.value)} placeholder="Téléphone (optionnel)" />
-          <ChampFormulaire
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            type="password"
-            placeholder="Mot de passe (8+ caractères, majuscule, chiffre)"
-          />
+          <ChampFormulaire value={telephone} onChange={(e) => setTelephone(e.target.value)} placeholder="Numéro WhatsApp (ex: 07 79 36 38 09)" />
         </div>
 
         <button
           type="button"
           onClick={creer}
-          disabled={enCours || !nom.trim() || !email.trim() || !password}
+          disabled={enCours || !nom.trim() || !telephone.trim()}
           className="bg-gradient-brand-blue mt-5 flex h-11 w-full items-center justify-center rounded-full text-sm font-semibold text-white disabled:opacity-50"
         >
           {enCours ? "Création…" : "Créer le client"}
@@ -202,6 +199,7 @@ function PanneauParametres({ onClose }: { onClose: () => void }) {
 
 export default function ListeClientsPage() {
   const { token } = useAuth();
+  const router = useRouter();
   const [clients, setClients] = useState<ClientAdmin[] | null>(null);
   const [pagination, setPagination] = useState<Pick<Pagination<ClientAdmin>, "current_page" | "last_page" | "total"> | null>(null);
   const [stats, setStats] = useState<StatsClients | null>(null);
@@ -256,7 +254,7 @@ export default function ListeClientsPage() {
       const lignes = data.data.map((c) => [
         c.nom,
         c.prenom ?? "",
-        c.email,
+        c.email ?? "",
         c.telephone ?? "",
         c.statut_compte,
         c.segment ? LIBELLE_SEGMENT_CLIENT[c.segment] : "",
@@ -321,9 +319,13 @@ export default function ListeClientsPage() {
         <ModaleNouveauClient
           token={token}
           onClose={() => setModaleNouveauClientOuverte(false)}
-          onCree={() => {
+          onCree={(clientId) => {
             setModaleNouveauClientOuverte(false);
-            rechargerClients();
+            // Direction la fiche du nouveau client : c'est là que l'admin
+            // enregistre son premier achat (bouton déjà existant), ce qui
+            // active garantie/avantages — inchangé. Le panneau s'ouvre
+            // directement pour enchaîner sans clic supplémentaire.
+            router.push(`/clients/consultation/${clientId}?ouvrir_achat=1`);
           }}
         />
       ) : null}

@@ -173,7 +173,7 @@ export type UtilisateurAdmin = {
   id: number;
   nom: string;
   prenom: string | null;
-  email: string;
+  email: string | null;
   telephone: string | null;
   type_utilisateur: string;
   statut_compte: StatutCompte;
@@ -201,7 +201,7 @@ export type ClientAdmin = {
   date_inscription: string;
   nom: string;
   prenom: string | null;
-  email: string;
+  email: string | null;
   telephone: string | null;
   statut_compte: StatutCompte;
   derniere_connexion: string | null;
@@ -222,7 +222,7 @@ export type ClientFidelite = {
   solde_portefeuille: number;
   nom: string;
   prenom: string | null;
-  email: string;
+  email: string | null;
   telephone: string | null;
   nombre_filleuls: number;
   derniere_transaction: string | null;
@@ -262,7 +262,7 @@ export type ReclamationAdmin = {
   reponse_admin: string | null;
   date_reclamation: string;
   date_traitement: string | null;
-  client: { user_id: number; user: PersonneCommande & { email: string; telephone: string | null } };
+  client: { user_id: number; user: PersonneCommande & { email: string | null; telephone: string | null } };
   commande: { id: number } | null;
 };
 
@@ -352,7 +352,7 @@ export const LIBELLE_STATUT_INTERVENTION: Record<StatutIntervention, string> = {
 
 export type ClientResume = {
   user_id: number;
-  user: { id: number; nom: string; prenom: string | null; email: string; telephone: string | null };
+  user: { id: number; nom: string; prenom: string | null; email: string | null; telephone: string | null };
 };
 
 export type TechnicienResume = {
@@ -433,7 +433,7 @@ export type ProfilClientDetail = {
     id: number;
     nom: string;
     prenom: string | null;
-    email: string;
+    email: string | null;
     telephone: string | null;
     statut_compte: StatutCompte;
     derniere_connexion: string | null;
@@ -613,7 +613,7 @@ export type ClientConversationIa = {
   id: number;
   nom: string;
   prenom: string | null;
-  email: string;
+  email: string | null;
   nombre_messages: number;
   dernier_message_date: string;
   dernier_message_contenu: string;
