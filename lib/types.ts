@@ -627,3 +627,32 @@ export type MessageAssistantIaAdmin = {
   contenu: string;
   date_envoi: string;
 };
+
+// --- Espace Coordinateur (miroir admin, GET /coordinateur/espace/statistiques) ----------
+
+export type StatistiquesEspaceCoordinateur = {
+  periode: { debut: string | null; fin: string | null };
+  commandes_recues: number;
+  commandes_validees: number;
+  commandes_en_attente: number;
+  commandes_en_cours: number;
+  commandes_en_livraison: number;
+  commandes_livrees: number;
+  commandes_annulees: number;
+  commandes_reportees: number;
+  commandes_client_injoignable: number;
+  commandes_numero_incorrect: number;
+  commission_generee: number;
+  commission_distribuee: number;
+};
+
+export type PeriodeEspaceCoordinateur = "aujourd_hui" | "semaine" | "semaine_derniere" | "mois" | "tout";
+
+export type ProduitActifCoordinateur = {
+  produit_id: number;
+  nom_produit: string;
+  photo: string | null;
+  statistiques: { recues: number; livrees: number; annulees: number; en_cours: number };
+  derniere_activite: string | null;
+  nouvelles_activites: number;
+};

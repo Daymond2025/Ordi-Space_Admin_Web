@@ -92,4 +92,13 @@ export const SECTIONS_SECONDAIRES: Record<string, SectionSecondaire> = {
       },
     ],
   },
+  // Miroir opérationnel de l'app Coordinateur — construit sous-espace par
+  // sous-espace (catalogue, fournisseurs, livreurs, commerciaux, réclamations,
+  // paiements viendront enrichir `groupes` au fil des prochains incréments).
+  "/coordinateurs": {
+    titre: "Espace Coordinateur",
+    rechercheLabel: "Recherche espace coordinateur",
+    racine: { label: "Tableau de bord", href: "/coordinateurs" },
+    groupes: [],
+  },
 };
