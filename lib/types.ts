@@ -52,6 +52,7 @@ export type Produit = {
   categorie: Categorie;
   images: ImageProduit[];
   fournisseur?: { id: number; nom_entreprise: string } | null;
+  est_booste: boolean;
 };
 
 export const LIBELLE_STATUT_PRODUIT: Record<StatutProduit, string> = {
@@ -655,4 +656,200 @@ export type ProduitActifCoordinateur = {
   statistiques: { recues: number; livrees: number; annulees: number; en_cours: number };
   derniere_activite: string | null;
   nouvelles_activites: number;
+};
+
+// --- Espace Coordinateur — Activité (GET /admin/coordinateurs/{id}/activites) ----------
+
+export type ActiviteCoordinateur = {
+  id: number;
+  action: string;
+  entite_concernee: string | null;
+  details: string | null;
+  date_heure: string;
+  acteur_id: number;
+};
+
+// --- Espace Coordinateur — Fournisseurs (miroir GET /fournisseurs*) ----------
+
+export type FournisseurAdmin = {
+  user_id: number;
+  nom_entreprise: string;
+  user: PersonneCommande & { email?: string; telephone: string | null };
+  produits_count: number;
+  commandes_en_attente_count: number;
+  commandes_total_count: number;
+  derniere_commande_le: string | null;
+  adresse_entreprise: string | null;
+  contact_pro: string | null;
+  nom_gerant: string | null;
+  telephone_gerant: string | null;
+  horaires_ouverture: string | null;
+  zone_couverte: string | null;
+  created_at: string;
+  montant_en_attente: number;
+};
+
+export type ProduitPlusVenduAdmin = {
+  produit_id: number;
+  nom_produit: string | null;
+  photo: string | null;
+  quantite_vendue: number;
+  montant: number;
+};
+
+export type FournisseurDetailAdmin = {
+  fournisseur: FournisseurAdmin;
+  statistiques: {
+    produits_total: number;
+    commandes_recues: number;
+    commandes_livrees: number;
+    commandes_annulees: number;
+  };
+};
+
+export type StatistiquesFournisseurAdmin = {
+  chiffre_affaires: number;
+  croissance_pourcentage: number | null;
+  produits_vendus: number;
+  produits_distincts_vendus: number;
+  commandes_recues: number;
+  commandes_livrees: number;
+  commandes_annulees: number;
+  commission_ordispace: number;
+  produits_plus_vendus: ProduitPlusVenduAdmin[];
+};
+
+export type TransactionPortefeuilleAdmin = {
+  id: number;
+  montant: number;
+  statut: "en_attente" | "paye" | null;
+  date_transaction: string;
+  nom_produit: string | null;
+  photo: string | null;
+};
+
+export type PortefeuilleFournisseurAdmin = {
+  solde: number;
+  taux_commission: number;
+  total_en_attente: number;
+  transactions: { data: TransactionPortefeuilleAdmin[] };
+};
+
+// --- Espace Coordinateur — Livreurs (miroir GET /coordinateur/livreurs*) ----------
+
+export type LivreurAdmin = {
+  user_id: number;
+  nom: string;
+  prenom: string | null;
+  telephone: string | null;
+  type_vehicule: string | null;
+  zone_couverture: string | null;
+  disponible: boolean;
+};
+
+export type StatistiquesLivreurAdmin = {
+  commandes_total: number;
+  commandes_livrees: number;
+  commandes_retournees: number;
+  gains_total_recu: number;
+  gains_non_deposes: number;
+};
+
+export type LivreurDetailAdmin = {
+  user_id: number;
+  nom: string;
+  prenom: string | null;
+  telephone: string | null;
+  disponible: boolean;
+  statistiques: StatistiquesLivreurAdmin;
+};
+
+export type PaiementMissionAdmin = {
+  mode_paiement: "mobile_money" | "especes";
+  date_limite_depot: string | null;
+  date_depot: string | null;
+};
+
+export type MissionLivreurAdmin = {
+  commande_id: number;
+  nom_produit: string | null;
+  nom_client: string;
+  nom_fournisseur: string | null;
+  zone_destination: string | null;
+  statut_commande: string;
+  statut_livraison: "en_preparation" | "en_attente_livreur" | "assignee" | "en_cours" | "livree" | "echouee";
+  retour_necessaire: boolean;
+  statut_retour: "en_cours" | "effectue" | null;
+  frais_livraison: number;
+  date_livraison_prevue: string | null;
+  date_livraison_effective: string | null;
+  paiement: PaiementMissionAdmin | null;
+};
+
+// --- Espace Coordinateur — Commerciaux (miroir GET /coordinateur/commerciaux*) ----------
+
+export type CommercialAdmin = {
+  user_id: number;
+  nom: string;
+  prenom: string | null;
+  actif: boolean;
+  membre_depuis: string;
+  commandes_total: number;
+  commandes_validees: number;
+  commandes_annulees: number;
+  commission_totale: number;
+};
+
+export type CommercialDetailAdmin = {
+  user_id: number;
+  nom: string;
+  prenom: string | null;
+  telephone: string | null;
+  actif: boolean;
+  nom_entreprise: string | null;
+  localisation: string | null;
+  statistiques: { commandes_total: number; commandes_validees: number; commandes_annulees: number; commission_totale: number };
+};
+
+// --- Espace Coordinateur — Réclamations (miroir GET /reclamations, 5 entités) ----------
+
+export type AuteurReclamationAdmin = {
+  id: number;
+  nom: string;
+  prenom: string | null;
+  type_utilisateur: string;
+  telephone?: string | null;
+};
+
+export type ReclamationCoordinateurAdmin = {
+  id: number;
+  sujet: string;
+  titre: string;
+  description: string;
+  statut: "nouvelle" | "en_cours" | "resolue" | "rejetee";
+  date_reclamation: string;
+  auteur: AuteurReclamationAdmin;
+};
+
+export type ProduitConcerneAdmin = { id: number; nom_produit: string; prix: number; photo: string | null; disponible: boolean };
+export type FournisseurConcerneAdmin = { user_id: number; nom_entreprise: string; nom: string; prenom: string | null; telephone: string | null };
+export type PreuveReclamationAdmin = { id: number; fichier: string };
+
+export type ReclamationDetailAdmin = ReclamationCoordinateurAdmin & {
+  reponse_admin: string | null;
+  date_traitement: string | null;
+  commande: { id: number; produit: ProduitConcerneAdmin | null; fournisseur: FournisseurConcerneAdmin | null } | null;
+  preuves: PreuveReclamationAdmin[];
+};
+
+// --- Espace Coordinateur — Paiements (miroir GET /coordinateur/portefeuille) ----------
+
+export type TransactionPortefeuilleGlobaleAdmin = TransactionPortefeuilleAdmin & { nom_fournisseur: string | null };
+
+export type PortefeuilleGlobalAdmin = {
+  solde_general: number;
+  total_general: number;
+  total_en_attente: number;
+  total_paye: number;
+  transactions: { data: TransactionPortefeuilleGlobaleAdmin[] };
 };

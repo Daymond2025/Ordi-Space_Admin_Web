@@ -4,8 +4,15 @@ import Image from "next/image";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
-import { formaterDate, formaterPrix } from "@/lib/types";
-import type { PeriodeEspaceCoordinateur, ProduitActifCoordinateur, StatistiquesEspaceCoordinateur } from "@/lib/types";
+import { formaterDate, formaterDateHeure, formaterPrix } from "@/lib/types";
+import type {
+  ActiviteCoordinateur,
+  Pagination,
+  PeriodeEspaceCoordinateur,
+  ProduitActifCoordinateur,
+  StatistiquesEspaceCoordinateur,
+  UtilisateurAdmin,
+} from "@/lib/types";
 import { PageHero } from "@/components/PageHero";
 import { CalendarIcon, CashIcon, CoordinateursIcon, ImagePlaceholderIcon, TriangleAlerteIcon } from "@/components/icons";
 
@@ -38,6 +45,10 @@ export function TableauDeBordCoordinateur() {
   const [stats, setStats] = useState<StatistiquesEspaceCoordinateur | null>(null);
   const [produits, setProduits] = useState<ProduitActifCoordinateur[] | null>(null);
 
+  const [coordinateurs, setCoordinateurs] = useState<UtilisateurAdmin[] | null>(null);
+  const [coordinateurId, setCoordinateurId] = useState<number | null>(null);
+  const [activites, setActivites] = useState<ActiviteCoordinateur[] | null>(null);
+
   useEffect(() => {
     if (!token) return;
     let annule = false;
@@ -62,6 +73,31 @@ export function TableauDeBordCoordinateur() {
       annule = true;
     };
   }, [token, periode]);
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch<Pagination<UtilisateurAdmin>>("/admin/utilisateurs?type_utilisateur=coordinateur&per_page=100", { token }).then((page) => {
+      setCoordinateurs(page.data);
+      setCoordinateurId((actuel) => actuel ?? page.data[0]?.id ?? null);
+    });
+  }, [token]);
+
+  useEffect(() => {
+    if (!token || !coordinateurId) return;
+    let annule = false;
+
+    apiFetch<Pagination<ActiviteCoordinateur>>(`/admin/coordinateurs/${coordinateurId}/activites?periode=tout&per_page=20`, { token })
+      .then((page) => {
+        if (!annule) setActivites(page.data);
+      })
+      .catch(() => {
+        if (!annule) setActivites([]);
+      });
+
+    return () => {
+      annule = true;
+    };
+  }, [token, coordinateurId]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -147,6 +183,46 @@ export function TableauDeBordCoordinateur() {
                     </p>
                   ) : null}
                 </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="flex flex-col gap-3">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-sm font-bold text-brand-ink">Activité du Coordinateur</h2>
+          {coordinateurs && coordinateurs.length > 1 ? (
+            <select
+              value={coordinateurId ?? ""}
+              onChange={(e) => setCoordinateurId(Number(e.target.value))}
+              className="rounded-full border border-brand-line bg-white px-4 py-2 text-xs font-semibold text-brand-ink outline-none"
+            >
+              {coordinateurs.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.prenom ? `${c.prenom} ` : ""}
+                  {c.nom}
+                </option>
+              ))}
+            </select>
+          ) : null}
+        </div>
+
+        {coordinateurs !== null && coordinateurs.length === 0 ? (
+          <p className="py-6 text-center text-sm text-brand-muted">Aucun compte coordinateur pour l&apos;instant.</p>
+        ) : activites === null ? (
+          <p className="py-6 text-center text-sm text-brand-muted">Chargement…</p>
+        ) : activites.length === 0 ? (
+          <p className="py-6 text-center text-sm text-brand-muted">Aucune activité enregistrée pour ce coordinateur.</p>
+        ) : (
+          <div className="flex flex-col gap-2">
+            {activites.map((activite) => (
+              <div key={activite.id} className="flex items-center justify-between rounded-2xl border border-brand-line bg-white p-4 text-sm">
+                <div>
+                  <p className="font-semibold text-brand-ink">{activite.details ?? activite.action}</p>
+                  {activite.entite_concernee ? <p className="text-xs text-brand-muted">{activite.entite_concernee}</p> : null}
+                </div>
+                <span className="shrink-0 text-xs text-brand-muted">{formaterDateHeure(activite.date_heure)}</span>
               </div>
             ))}
           </div>

@@ -93,12 +93,41 @@ export const SECTIONS_SECONDAIRES: Record<string, SectionSecondaire> = {
     ],
   },
   // Miroir opérationnel de l'app Coordinateur — construit sous-espace par
-  // sous-espace (catalogue, fournisseurs, livreurs, commerciaux, réclamations,
-  // paiements viendront enrichir `groupes` au fil des prochains incréments).
+  // sous-espace (fournisseurs, livreurs, commerciaux, catalogue déjà faits ;
+  // réclamations vit ici puisqu'elle couvre 5 entités, pas que les clients).
   "/coordinateurs": {
     titre: "Espace Coordinateur",
     rechercheLabel: "Recherche espace coordinateur",
     racine: { label: "Tableau de bord", href: "/coordinateurs" },
+    groupes: [
+      {
+        label: "Suivi du Coordinateur",
+        elements: [{ label: "Réclamations", href: "/coordinateurs/reclamations" }],
+      },
+    ],
+  },
+  "/fournisseurs": {
+    titre: "Fournisseurs",
+    rechercheLabel: "Recherche fournisseurs",
+    racine: { label: "Liste des fournisseurs", href: "/fournisseurs" },
+    groupes: [],
+  },
+  "/livreurs": {
+    titre: "Livreurs",
+    rechercheLabel: "Recherche livreurs",
+    racine: { label: "Liste des livreurs", href: "/livreurs" },
+    groupes: [],
+  },
+  "/commerciaux": {
+    titre: "Commerciaux",
+    rechercheLabel: "Recherche commerciaux",
+    racine: { label: "Liste des commerciaux", href: "/commerciaux" },
+    groupes: [],
+  },
+  "/finance": {
+    titre: "Paiements",
+    rechercheLabel: "Recherche paiements",
+    racine: { label: "Portefeuille global", href: "/finance" },
     groupes: [],
   },
 };

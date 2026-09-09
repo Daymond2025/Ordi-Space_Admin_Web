@@ -132,7 +132,12 @@ export default function ReclamationsPage() {
 
   function recharger() {
     if (!token) return;
-    const params = new URLSearchParams({ per_page: "10", page: String(page) });
+    // Le backend traite désormais 5 types d'entités auteur (Reclamation
+    // généralisée) — cet écran ne sait afficher que reclamation.client.user.*
+    // (ancien format), donc on se scope explicitement aux clients pour ne
+    // jamais recevoir une réclamation d'une autre entité (voir l'écran
+    // "Réclamations" de l'Espace Coordinateur pour les 5 entités).
+    const params = new URLSearchParams({ per_page: "10", page: String(page), type_auteur: "client" });
     if (statutFiltre) params.set("statut", statutFiltre);
 
     apiFetch<Pagination<ReclamationAdmin>>(`/reclamations?${params}`, { token }).then((p) => {
