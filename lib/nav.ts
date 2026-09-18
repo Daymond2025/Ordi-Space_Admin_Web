@@ -115,8 +115,13 @@ export const SECTIONS_SECONDAIRES: Record<string, SectionSecondaire> = {
   "/livreurs": {
     titre: "Livreurs",
     rechercheLabel: "Recherche livreurs",
-    racine: { label: "Liste des livreurs", href: "/livreurs" },
-    groupes: [],
+    racine: { label: "Tableau de bord", href: "/livreurs" },
+    groupes: [
+      {
+        label: "Gestion livreurs",
+        elements: [{ label: "Liste des livreurs", href: "/livreurs/liste" }],
+      },
+    ],
   },
   "/commerciaux": {
     titre: "Commerciaux",

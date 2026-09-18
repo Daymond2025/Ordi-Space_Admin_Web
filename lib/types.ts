@@ -297,6 +297,36 @@ export type StatsClients = {
   en_ligne: number;
 };
 
+// --- Tableau de bord Livreurs (admin/livreurs/tableau-de-bord) -----------
+
+export type TableauDeBordLivreurs = {
+  livreurs: {
+    total: number;
+    actifs: number;
+    suspendus: number;
+    desactives: number;
+    en_ligne: number;
+    disponibles_maintenant: number;
+    nouveaux_7j: number;
+    nouveaux_30j: number;
+  };
+  types_vehicule: { moto: number; voiture: number; tricycle: number; velo: number; non_defini: number };
+  inscriptions_par_semaine: { semaine: string; total: number }[];
+  missions: {
+    vivier: number;
+    en_cours: number;
+    livrees: number;
+    par_statut: Partial<Record<string, number>>;
+  };
+  retours: { total: number; par_statut: Partial<Record<"en_cours" | "effectue", number>> };
+  paiements_cod: { total_encaisse: number; non_depose: number; en_retard: number };
+};
+
+export const LIBELLE_STATUT_RETOUR: Record<string, string> = {
+  en_cours: "Retour en cours",
+  effectue: "Retour effectué",
+};
+
 export function clientDepuisLibelle(dateInscriptionIso: string): string {
   const debut = new Date(dateInscriptionIso).getTime();
   const joursEcoules = Math.floor((Date.now() - debut) / (1000 * 60 * 60 * 24));
@@ -544,6 +574,7 @@ export type CommandeDetailAdmin = {
 export const LIBELLE_STATUT_LIVRAISON: Record<string, string> = {
   en_preparation: "En préparation",
   en_attente_livreur: "En attente d'un livreur",
+  assignee: "Assignée",
   en_cours: "En cours de livraison",
   livree: "Livrée",
   echouee: "Échouée",
