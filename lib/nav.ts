@@ -90,7 +90,10 @@ export const SECTIONS_SECONDAIRES: Record<string, SectionSecondaire> = {
     groupes: [
       {
         label: "Catalogue",
-        elements: [{ label: "Produits", href: "/operations/produits" }],
+        elements: [
+          { label: "Produits", href: "/operations/produits" },
+          { label: "Catégories", href: "/operations/categories" },
+        ],
       },
     ],
   },

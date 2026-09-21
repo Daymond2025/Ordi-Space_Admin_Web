@@ -14,6 +14,13 @@ import {
 import { ChevronLeftIcon, TrashIcon } from "@/components/icons";
 import { Listbox } from "@/components/Listbox";
 import { AjoutCategorieRapide } from "@/components/AjoutCategorieRapide";
+import {
+  CHAMPS_BOUTIQUE_VIDES,
+  ChampsBoutiqueProduit,
+  champsDepuisProduit,
+  champsVersCorps,
+  type ChampsBoutique,
+} from "@/components/ChampsBoutiqueProduit";
 
 const OPTIONS_LIVRAISON = [
   { value: "physique", label: "Physique" },
@@ -33,6 +40,7 @@ export function EditionProduit({ id }: { id: string }) {
   const [stock, setStock] = useState("");
   const [typeLivraison, setTypeLivraison] = useState<"physique" | "numerique">("physique");
   const [dureeGarantie, setDureeGarantie] = useState("");
+  const [boutique, setBoutique] = useState<ChampsBoutique>(CHAMPS_BOUTIQUE_VIDES);
   const [nouvellesImages, setNouvellesImages] = useState<FileList | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
@@ -50,6 +58,7 @@ export function EditionProduit({ id }: { id: string }) {
       setStock(String(p.quantite_stock));
       setTypeLivraison(p.type_livraison);
       setDureeGarantie(p.duree_garantie_mois ? String(p.duree_garantie_mois) : "");
+      setBoutique(champsDepuisProduit(p));
     });
   }, [token, id]);
 
@@ -73,6 +82,7 @@ export function EditionProduit({ id }: { id: string }) {
           quantite_stock: Number(stock),
           type_livraison: typeLivraison,
           duree_garantie_mois: dureeGarantie ? Number(dureeGarantie) : null,
+          ...champsVersCorps(boutique),
         },
       });
       setProduit(misAJour);
@@ -269,6 +279,8 @@ export function EditionProduit({ id }: { id: string }) {
               <input type="number" min="0" value={dureeGarantie} onChange={(e) => setDureeGarantie(e.target.value)} className="h-11 rounded-xl border border-brand-line px-3 text-sm" />
             </div>
           </div>
+
+          <ChampsBoutiqueProduit valeurs={boutique} onChange={setBoutique} token={token} />
 
           <button type="submit" disabled={chargement} className="bg-gradient-brand-blue mt-2 flex h-11 items-center justify-center rounded-xl text-sm font-semibold text-white disabled:opacity-60">
             {chargement ? "Enregistrement…" : "Enregistrer"}

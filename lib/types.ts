@@ -26,10 +26,25 @@ export function formaterDateHeure(iso: string): string {
 
 // --- Produits ---------------------------------------------------------
 
+export type FamilleCategorie = "ordinateur" | "accessoires" | "logiciels";
+
+export const LIBELLE_FAMILLE_CATEGORIE: Record<FamilleCategorie, string> = {
+  ordinateur: "Ordinateur",
+  accessoires: "Accessoires",
+  logiciels: "Logiciels",
+};
+
 export type Categorie = {
   id: number;
   nom_categorie: string;
   description: string | null;
+  /** Onglet de l'écran "Catégorie" de la Boutique des livreurs ; `ordre_filtre` non nul = proposée comme choix du filtre. */
+  famille: FamilleCategorie | null;
+  /** Logiciels : titre de la section ("Pack office", "Navigateur"…). */
+  groupe: string | null;
+  /** Nom court affiché sur la tuile (à défaut : `nom_categorie`). */
+  libelle: string | null;
+  ordre_filtre: number | null;
 };
 
 export type ImageProduit = {
@@ -53,6 +68,20 @@ export type Produit = {
   images: ImageProduit[];
   fournisseur?: { id: number; nom_entreprise: string } | null;
   est_booste: boolean;
+  marque: string | null;
+  etat_produit: string | null;
+  processeur: string | null;
+  memoire_ram: string | null;
+  stockage: string | null;
+  taille: string | null;
+  systeme_exploitation: string | null;
+  carte_graphique: string | null;
+  couleur: string | null;
+  prix_vente: string | null;
+  commission_revente: string | null;
+  prix_barre: string | null;
+  pourcentage_reduction: number | null;
+  frais_livraison?: { montant: string; localite: { id: number; nom: string } | null }[];
 };
 
 export const LIBELLE_STATUT_PRODUIT: Record<StatutProduit, string> = {

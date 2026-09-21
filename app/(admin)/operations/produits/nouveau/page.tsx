@@ -8,6 +8,7 @@ import type { Categorie, Produit } from "@/lib/types";
 import { ChevronLeftIcon } from "@/components/icons";
 import { Listbox } from "@/components/Listbox";
 import { AjoutCategorieRapide } from "@/components/AjoutCategorieRapide";
+import { CHAMPS_BOUTIQUE_VIDES, ChampsBoutiqueProduit, champsVersFormData, type ChampsBoutique } from "@/components/ChampsBoutiqueProduit";
 
 const OPTIONS_LIVRAISON = [
   { value: "physique", label: "Physique" },
@@ -26,6 +27,7 @@ export default function NouveauProduitPage() {
   const [stock, setStock] = useState("");
   const [typeLivraison, setTypeLivraison] = useState<"physique" | "numerique">("physique");
   const [dureeGarantie, setDureeGarantie] = useState("");
+  const [boutique, setBoutique] = useState<ChampsBoutique>(CHAMPS_BOUTIQUE_VIDES);
   const [images, setImages] = useState<FileList | null>(null);
   const [erreur, setErreur] = useState<string | null>(null);
   const [chargement, setChargement] = useState(false);
@@ -55,6 +57,7 @@ export default function NouveauProduitPage() {
     donnees.append("quantite_stock", stock);
     donnees.append("type_livraison", typeLivraison);
     if (dureeGarantie) donnees.append("duree_garantie_mois", dureeGarantie);
+    champsVersFormData(donnees, boutique);
     if (images) {
       Array.from(images).forEach((fichier) => donnees.append("images[]", fichier));
     }
@@ -133,7 +136,9 @@ export default function NouveauProduitPage() {
           </div>
         </div>
 
-        <div className="flex flex-col gap-1.5">
+        <ChampsBoutiqueProduit valeurs={boutique} onChange={setBoutique} token={token} />
+
+        <div className="flex flex-col gap-1.5 border-t border-brand-line pt-5">
           <label className="text-xs font-medium text-brand-muted">Images</label>
           <input type="file" multiple accept="image/*" onChange={(e) => setImages(e.target.files)} className="text-sm" />
         </div>
