@@ -884,3 +884,99 @@ export type PortefeuilleGlobalAdmin = {
   total_paye: number;
   transactions: { data: TransactionPortefeuilleGlobaleAdmin[] };
 };
+
+// --- Livreurs — Boutique : retraits de commissions et commandes -------------------------
+
+export type StatutRetraitAdmin = "en_attente" | "valide" | "refuse" | "annule";
+
+/** Ligne de GET /admin/retraits (Admin\RetraitController::index()). */
+export type RetraitAdmin = {
+  id: number;
+  livreur: string;
+  livreur_telephone: string | null;
+  montant: number;
+  operateur: string;
+  telephone: string;
+  statut: StatutRetraitAdmin;
+  /** Référence du transfert, posée à la validation. */
+  reference: string | null;
+  /** Motif du refus. */
+  remarque: string | null;
+  created_at: string;
+  traite_le: string | null;
+};
+
+export type ReponseRetraitsAdmin = {
+  stats: Record<StatutRetraitAdmin, { nombre: number; montant: number }>;
+  retraits: Pagination<RetraitAdmin>;
+};
+
+export type StatutVenteBoutiqueAdmin = "en_attente" | "en_cours" | "livree" | "annulee";
+export type SourceVenteBoutiqueAdmin = "manuelle" | "whatsapp" | "qr";
+
+/** Ligne de GET /admin/boutique/commandes (Admin\BoutiqueController::commandes()). */
+export type CommandeBoutiqueAdmin = {
+  id: number;
+  commande_id: number;
+  livreur_id: number;
+  livreur: string;
+  livreur_telephone: string | null;
+  client: string;
+  client_telephone: string | null;
+  nom_produit: string | null;
+  prix_vente: number;
+  commission: number;
+  source: SourceVenteBoutiqueAdmin;
+  statut: StatutVenteBoutiqueAdmin;
+  statut_commande: StatutCommande;
+  date: string;
+};
+
+export type ReponseCommandesBoutiqueAdmin = {
+  stats: {
+    par_statut: Record<StatutVenteBoutiqueAdmin, number>;
+    /** Commission que la validation des commandes en attente rendra acquise aux livreurs. */
+    commission_a_valider: number;
+    commission_acquise: number;
+  };
+  commandes: Pagination<CommandeBoutiqueAdmin>;
+};
+
+// --- Commandes — onglet central (GET /admin/commandes) -----------------------------------
+
+export type StatutCommandeCentrale =
+  | "en_attente"
+  | "validee"
+  | "en_preparation"
+  | "en_livraison"
+  | "livree"
+  | "annulee"
+  | "reportee"
+  | "client_injoignable"
+  | "numero_incorrect";
+
+/** Ligne de GET /admin/commandes (Admin\CommandeController::index()). */
+export type CommandeCentrale = {
+  id: number;
+  date: string;
+  statut_commande: StatutCommandeCentrale;
+  client: string;
+  client_telephone: string | null;
+  nom_produit: string | null;
+  nombre_lignes: number;
+  montant_total: number;
+  total_a_payer: number;
+  canal: string | null;
+  /** "boutique" : apportée par un livreur (commande manuelle, lien, vitrine ou QR) ; "directe" : toutes les autres. */
+  origine: "boutique" | "directe";
+  vendeur: string | null;
+  vendeur_id: number | null;
+  source: "manuelle" | "whatsapp" | "qr" | null;
+  livreur: string | null;
+  statut_paiement: string | null;
+};
+
+export type ReponseCommandesCentrales = {
+  stats: { par_statut: Record<StatutCommandeCentrale, number>; total: number };
+  commandes: Pagination<CommandeCentrale>;
+};

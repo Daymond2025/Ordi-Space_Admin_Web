@@ -1,5 +1,6 @@
 import type { ComponentType, SVGProps } from "react";
 import {
+  BagIcon,
   ClientsIcon,
   CommerciauxIcon,
   CoordinateursIcon,
@@ -21,6 +22,7 @@ export type NavItem = {
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: DashboardIcon },
   { href: "/operations", label: "Operations", icon: OperationsIcon },
+  { href: "/commandes", label: "Commandes", icon: BagIcon },
   { href: "/clients", label: "Clients", icon: ClientsIcon },
   { href: "/commerciaux", label: "Commerciaux", icon: CommerciauxIcon },
   { href: "/fournisseurs", label: "Fournisseurs", icon: FournisseursIcon },
@@ -120,6 +122,13 @@ export const SECTIONS_SECONDAIRES: Record<string, SectionSecondaire> = {
       {
         label: "Gestion livreurs",
         elements: [{ label: "Liste des livreurs", href: "/livreurs/liste" }],
+      },
+      {
+        label: "Boutique des livreurs",
+        elements: [
+          { label: "Commandes boutique", href: "/livreurs/commandes" },
+          { label: "Retraits", href: "/livreurs/retraits" },
+        ],
       },
     ],
   },
