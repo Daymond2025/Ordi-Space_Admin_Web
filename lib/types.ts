@@ -589,6 +589,7 @@ export type CommandeDetailAdmin = {
   statut_commande: StatutCommande;
   montant_total: string;
   montant_remise: string;
+  frais_livraison: string;
   date_commande: string;
   date_validation: string | null;
   commercial: { user_id: number; type_commercial: string; user: PersonneCommande } | null;
@@ -598,6 +599,10 @@ export type CommandeDetailAdmin = {
   paiement: PaiementDetail | null;
   privilege: { id: number; titre: string; type_privilege: string; code_promo: string | null } | null;
   parrain: { user_id: number; user: PersonneCommande } | null;
+  /** Paiement de confirmation réglé en ligne (page acheteur) : non remboursable, déduit du reliquat. */
+  acompte: { id: number; montant: number; statut: string; date_paiement: string | null } | null;
+  /** Ce que le client doit encore à la livraison : le total moins la confirmation payée. */
+  reliquat: number;
 };
 
 export const LIBELLE_STATUT_LIVRAISON: Record<string, string> = {
@@ -1003,9 +1008,39 @@ export type CommandeCentrale = {
   source: "manuelle" | "whatsapp" | "qr" | null;
   livreur: string | null;
   statut_paiement: string | null;
+  /** Confirmation payée en ligne (page acheteur), s'il y en a une. */
+  confirmation: { montant: number; statut: string; date: string | null } | null;
+  /** Ce que le client doit encore à la livraison. */
+  reliquat: number;
 };
 
 export type ReponseCommandesCentrales = {
   stats: { par_statut: Record<StatutCommandeCentrale, number>; total: number };
   commandes: Pagination<CommandeCentrale>;
+};
+
+/** Une ligne de GET /admin/confirmations : un paiement de confirmation (page acheteur), avec ou sans commande. */
+export type ConfirmationSuivi = {
+  id: number;
+  date: string;
+  /** en_attente : Wave n'a pas encore confirmé ; confirme : payée ; echoue : non abouti. */
+  statut: "en_attente" | "confirme" | "echoue";
+  montant: number;
+  date_paiement: string | null;
+  /** Payée, mais la commande n'a pas pu être créée (stock épuisé entre-temps) : à traiter à la main. */
+  anomalie: boolean;
+  erreur: string | null;
+  commande_id: number | null;
+  client: string;
+  client_telephone: string;
+  nom_produit: string | null;
+  quantite: number;
+  localite: string | null;
+  vendeur: string | null;
+  source: "whatsapp" | "qr";
+};
+
+export type ReponseConfirmations = {
+  stats: { en_attente: number; confirme: number; echoue: number; anomalie: number; encaisse: number };
+  confirmations: Pagination<ConfirmationSuivi>;
 };

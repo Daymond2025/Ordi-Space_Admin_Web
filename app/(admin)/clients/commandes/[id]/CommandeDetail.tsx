@@ -38,7 +38,7 @@ import { Listbox } from "@/components/Listbox";
 
 const DEGRADE_ETAPE = "linear-gradient(270deg, #00BFFF 0%, #0077FF 100%)";
 
-const ETAPES: { statut: StatutCommande; label: string; icone: typeof BagIcon }[] = [
+const ETAPES: { statut: StatutCommande | "confirmation"; label: string; icone: typeof BagIcon }[] = [
   { statut: "en_attente", label: "Commande passée", icone: BagIcon },
   { statut: "validee", label: "Commande validée", icone: CheckIcon },
   { statut: "en_preparation", label: "En préparation", icone: FournisseursIcon },
@@ -60,8 +60,13 @@ const OPTIONS_STATUT = (Object.keys(LIBELLE_STATUT_COMMANDE) as StatutCommande[]
   label: LIBELLE_STATUT_COMMANDE[s],
 }));
 
-function dateEtape(statut: StatutCommande, commande: CommandeDetailAdmin): string | null {
+/** Étape "Confirmation payée" : présente seulement pour une commande de la page acheteur, avant sa validation. */
+const ETAPE_CONFIRMATION = { statut: "confirmation" as const, label: "Confirmation payée", icone: ShieldCheckIcon };
+
+function dateEtape(statut: StatutCommande | "confirmation", commande: CommandeDetailAdmin): string | null {
   switch (statut) {
+    case "confirmation":
+      return commande.acompte?.date_paiement ?? null;
     case "en_attente":
       return commande.date_commande;
     case "validee":
@@ -162,6 +167,10 @@ export function CommandeDetail({ id }: { id: string }) {
   if (commande === null) return <p className="text-sm text-brand-muted">Cette commande est introuvable.</p>;
 
   const ordreActuel = ORDRE_STATUT[commande.statut_commande];
+  const acomptePaye = commande.acompte?.statut === "confirme" ? commande.acompte : null;
+  // Une commande de la page acheteur commence par sa confirmation payée : une étape de plus, avant "Commande passée"... et déjà atteinte.
+  const etapes = acomptePaye ? [ETAPE_CONFIRMATION, ...ETAPES] : ETAPES;
+  const decalage = acomptePaye ? 1 : 0;
 
   const fournisseurs = Array.from(
     new Map(commande.lignes.filter((l) => l.produit.fournisseur).map((l) => [l.produit.fournisseur!.user_id, l.produit.fournisseur!])).values()
@@ -260,6 +269,24 @@ export function CommandeDetail({ id }: { id: string }) {
               <span className="font-semibold text-emerald-600">-{formaterPrix(commande.montant_remise)} CFA</span>
             </div>
           ) : null}
+          {Number(commande.frais_livraison) > 0 ? (
+            <div className="flex items-center justify-between">
+              <span className="text-brand-muted">Frais de livraison</span>
+              <span className="font-semibold text-brand-ink">+{formaterPrix(commande.frais_livraison)} CFA</span>
+            </div>
+          ) : null}
+          {acomptePaye ? (
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-brand-muted">Confirmation payée en ligne (non remboursable)</span>
+                <span className="font-semibold text-emerald-600">-{formaterPrix(acomptePaye.montant)} CFA</span>
+              </div>
+              <div className="flex items-center justify-between border-t border-brand-line pt-2">
+                <span className="font-semibold text-brand-ink">Reliquat du client, à payer à la livraison</span>
+                <span className="font-extrabold text-[#EA6A12]">{formaterPrix(commande.reliquat)} CFA</span>
+              </div>
+            </>
+          ) : null}
           {commande.parrain ? (
             <div className="flex items-center justify-between">
               <span className="text-brand-muted">Parrainage</span>
@@ -325,8 +352,8 @@ export function CommandeDetail({ id }: { id: string }) {
           <div className="mt-6 rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-600">Cette commande a été annulée.</div>
         ) : (
           <div className="mt-10 flex items-start overflow-x-auto pb-2">
-            {ETAPES.map((etape, i) => {
-              const atteint = ordreActuel >= i;
+            {etapes.map((etape, i) => {
+              const atteint = ordreActuel + decalage >= i;
               const date = dateEtape(etape.statut, commande);
               const labelEnHaut = i % 2 === 0;
               const Icone = etape.icone;
@@ -357,9 +384,9 @@ export function CommandeDetail({ id }: { id: string }) {
                     <span
                       className="h-1.5 flex-1"
                       style={
-                        i === ETAPES.length - 1
+                        i === etapes.length - 1
                           ? undefined
-                          : { background: ordreActuel > i ? DEGRADE_ETAPE : "var(--color-brand-line)" }
+                          : { background: ordreActuel + decalage > i ? DEGRADE_ETAPE : "var(--color-brand-line)" }
                       }
                     />
                   </div>
@@ -382,6 +409,29 @@ export function CommandeDetail({ id }: { id: string }) {
           <p className="text-sm font-bold text-brand-ink">Détails sur les paiements</p>
           <ChevronDownIcon className={`h-4 w-4 text-brand-muted transition-transform ${paiementOuvert ? "rotate-180" : ""}`} />
         </button>
+
+        {paiementOuvert && commande.acompte ? (
+          <div className="mt-4 grid grid-cols-2 gap-4 border-t border-brand-line pt-4 text-sm sm:grid-cols-4">
+            <div>
+              <p className="text-xs text-brand-muted">Confirmation (Wave)</p>
+              <p className="mt-0.5 font-semibold text-brand-ink">{formaterPrix(commande.acompte.montant)} CFA</p>
+            </div>
+            <div>
+              <p className="text-xs text-brand-muted">Statut</p>
+              <span className={`mt-0.5 inline-block rounded-full px-2.5 py-1 text-[11px] font-semibold ${STYLE_STATUT_PAIEMENT[commande.acompte.statut]}`}>
+                {LIBELLE_STATUT_PAIEMENT[commande.acompte.statut] ?? commande.acompte.statut}
+              </span>
+            </div>
+            <div>
+              <p className="text-xs text-brand-muted">Date</p>
+              <p className="mt-0.5 font-semibold text-brand-ink">{commande.acompte.date_paiement ? formaterDateHeure(commande.acompte.date_paiement) : "—"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-brand-muted">Reliquat à la livraison</p>
+              <p className="mt-0.5 font-semibold text-brand-ink">{formaterPrix(commande.reliquat)} CFA</p>
+            </div>
+          </div>
+        ) : null}
 
         {paiementOuvert ? (
           commande.paiement ? (

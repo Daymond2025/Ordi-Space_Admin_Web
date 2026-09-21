@@ -11,7 +11,7 @@ import {
   type ReponseCommandesCentrales,
   type StatutCommandeCentrale,
 } from "@/lib/types";
-import { BagIcon, CheckIcon, SearchIcon } from "@/components/icons";
+import { BagIcon, CheckIcon, SearchIcon, ShieldCheckIcon } from "@/components/icons";
 import { PageHero } from "@/components/PageHero";
 
 const ONGLETS: { id: StatutCommandeCentrale | "toutes"; label: string }[] = [
@@ -134,6 +134,15 @@ export default function CommandesPage() {
         titre="Commandes"
         description="Toutes les commandes de la plateforme, quelle que soit leur origine."
         icone={BagIcon}
+        action={
+          <Link
+            href="/commandes/confirmations"
+            className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-[color:var(--brand-blue-end)] shadow-sm"
+          >
+            <ShieldCheckIcon className="h-4 w-4" />
+            Confirmations
+          </Link>
+        }
         stats={[
           { valeur: parStatut ? parStatut.en_attente : "—", label: "À valider" },
           { valeur: parStatut ? parStatut.validee + parStatut.en_preparation + parStatut.en_livraison : "—", label: "En traitement" },
@@ -237,7 +246,18 @@ export default function CommandesPage() {
                         {c.nom_produit ?? "—"}
                         {c.nombre_lignes > 1 ? <span className="text-xs text-brand-muted"> +{c.nombre_lignes - 1}</span> : null}
                       </td>
-                      <td className="whitespace-nowrap px-3 py-3 text-right font-extrabold text-brand-ink">{formaterPrix(c.total_a_payer)} F</td>
+                      <td className="whitespace-nowrap px-3 py-3 text-right">
+                        <p className="font-extrabold text-brand-ink">{formaterPrix(c.total_a_payer)} F</p>
+                        {c.confirmation && c.confirmation.statut === "confirme" ? (
+                          <>
+                            <p className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700">
+                              <ShieldCheckIcon className="h-3 w-3" />
+                              Confirmation {formaterPrix(c.confirmation.montant)} F payée
+                            </p>
+                            <p className="mt-0.5 text-[11px] text-brand-muted">Reliquat : {formaterPrix(c.reliquat)} F</p>
+                          </>
+                        ) : null}
+                      </td>
                       <td className="px-3 py-3">
                         {c.origine === "boutique" && c.vendeur_id ? (
                           <Link href={`/livreurs/${c.vendeur_id}`} className="font-semibold text-brand-ink hover:underline">
