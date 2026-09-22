@@ -1,5 +1,9 @@
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
 
+// Sans ça, une requête dont la réponse n'arrive jamais laisse l'écran sur
+// "Chargement…" indéfiniment — rien ne rejette la promesse.
+const DELAI_REQUETE_MS = 20_000;
+
 export type ApiError = {
   code: string;
   message: string;
@@ -30,16 +34,35 @@ async function requeteApi(path: string, options: { method?: string; body?: unkno
     methode = "POST";
   }
 
-  const response = await fetch(`${BASE_URL}${path}`, {
-    method: methode,
-    cache: "no-store",
-    headers: {
-      Accept: "application/json",
-      ...(estFormData ? {} : { "Content-Type": "application/json" }),
-      ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
-    },
-    body: estFormData ? (options.body as FormData) : options.body ? JSON.stringify(options.body) : undefined,
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${BASE_URL}${path}`, {
+      method: methode,
+      cache: "no-store",
+      signal: AbortSignal.timeout(DELAI_REQUETE_MS),
+      headers: {
+        Accept: "application/json",
+        ...(estFormData ? {} : { "Content-Type": "application/json" }),
+        ...(options.token ? { Authorization: `Bearer ${options.token}` } : {}),
+      },
+      body: estFormData ? (options.body as FormData) : options.body ? JSON.stringify(options.body) : undefined,
+    });
+  } catch (e) {
+    // fetch() rejette avec une exception brute (jamais une réponse HTTP) sur
+    // un réseau injoignable ou l'abandon ci-dessus — uniformisé en
+    // ApiRequestError pour que tout appelant n'ait qu'une seule forme
+    // d'erreur à gérer.
+    const delaiDepasse = e instanceof DOMException && e.name === "TimeoutError";
+    throw new ApiRequestError(
+      {
+        code: delaiDepasse ? "TIMEOUT" : "NETWORK_ERROR",
+        message: delaiDepasse
+          ? "La connexion a mis trop de temps à répondre. Vérifie ta connexion et réessaie."
+          : "Impossible de joindre le serveur. Vérifie ta connexion et réessaie.",
+      },
+      0
+    );
+  }
 
   const json = await response.json().catch(() => null);
 

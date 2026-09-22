@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -97,6 +98,10 @@ export default function LoginPage() {
             >
               {chargement ? "Connexion…" : "Se connecter"}
             </button>
+
+            <Link href="/login/mot-de-passe-oublie" className="text-center text-xs font-medium text-brand-muted underline underline-offset-2">
+              Mot de passe oublié ?
+            </Link>
           </form>
         ) : (
           <form onSubmit={soumettreOtp} className="mt-8 flex flex-col gap-4">
