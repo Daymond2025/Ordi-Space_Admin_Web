@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { apiFetch } from "@/lib/api";
-import type { Produit } from "@/lib/types";
+import { formaterPrix, type Produit } from "@/lib/types";
 import { Listbox } from "@/components/Listbox";
 
 /**
@@ -27,6 +27,10 @@ export type ChampsBoutique = {
   commissionRevente: string;
   /** id de localité → frais saisis ; vide = localité non livrée. */
   frais: Record<number, string>;
+  /** Incitation marketing (liste prédéfinie côté mobile, ici texte libre — même effet). */
+  cadeaux: string[];
+  /** Contenu matériel du carton (ex. "Sacoche", "Souris") — distinct de `cadeaux`. */
+  contenuPack: string[];
 };
 
 export const CHAMPS_BOUTIQUE_VIDES: ChampsBoutique = {
@@ -44,6 +48,8 @@ export const CHAMPS_BOUTIQUE_VIDES: ChampsBoutique = {
   reduction: "",
   commissionRevente: "",
   frais: {},
+  cadeaux: [],
+  contenuPack: [],
 };
 
 const MARQUES_SUGGEREES = ["HP", "Dell", "Lenovo", "Macbook", "Asus", "Toshiba", "Chromebook"];
@@ -79,6 +85,8 @@ export function champsDepuisProduit(p: Produit): ChampsBoutique {
     reduction: p.pourcentage_reduction === null ? "" : String(p.pourcentage_reduction),
     commissionRevente: entier(p.commission_revente),
     frais: Object.fromEntries((p.frais_livraison ?? []).filter((f) => f.localite).map((f) => [f.localite!.id, entier(f.montant)])),
+    cadeaux: p.cadeaux ?? [],
+    contenuPack: p.contenu_pack ?? [],
   };
 }
 
@@ -105,6 +113,8 @@ export function champsVersCorps(c: ChampsBoutique): Record<string, unknown> {
     prix_barre: nombre(c.prixBarre),
     pourcentage_reduction: nombre(c.reduction),
     commission_revente: nombre(c.commissionRevente),
+    cadeaux: c.cadeaux,
+    contenu_pack: c.contenuPack,
     // Remplacement complet du barème ; omis, il reste tel quel (voir ProduitController::update()).
     ...(frais.length > 0 ? { frais_livraison: frais } : {}),
   };
@@ -114,13 +124,15 @@ export function champsVersCorps(c: ChampsBoutique): Record<string, unknown> {
 export function champsVersFormData(donnees: FormData, c: ChampsBoutique): void {
   const corps = champsVersCorps(c);
   Object.entries(corps).forEach(([cle, valeur]) => {
-    if (cle === "frais_livraison" || valeur === null) return;
+    if (cle === "frais_livraison" || cle === "cadeaux" || cle === "contenu_pack" || valeur === null) return;
     donnees.append(cle, String(valeur));
   });
   lignesFrais(c.frais).forEach((ligne, index) => {
     donnees.append(`frais_livraison[${index}][localite_id]`, String(ligne.localite_id));
     donnees.append(`frais_livraison[${index}][montant]`, String(ligne.montant));
   });
+  c.cadeaux.forEach((valeur) => donnees.append("cadeaux[]", valeur));
+  c.contenuPack.forEach((valeur) => donnees.append("contenu_pack[]", valeur));
 }
 
 function Champ({ libelle, children }: { libelle: string; children: React.ReactNode }) {
@@ -140,14 +152,76 @@ function ChampTexte({ libelle, valeur, onChange, type = "text", suffixe }: { lib
   );
 }
 
+/** Liste de tags en texte libre (cadeaux, contenu du pack) — saisie + Entrée, retirables. */
+function ChampTags({
+  libelle,
+  description,
+  placeholder,
+  valeurs,
+  onChange,
+}: {
+  libelle: string;
+  description?: string;
+  placeholder: string;
+  valeurs: string[];
+  onChange: (v: string[]) => void;
+}) {
+  const [saisie, setSaisie] = useState("");
+
+  function ajouter() {
+    const valeur = saisie.trim();
+    if (!valeur || valeurs.includes(valeur)) return;
+    onChange([...valeurs, valeur]);
+    setSaisie("");
+  }
+
+  return (
+    <Champ libelle={libelle}>
+      {description ? <p className="-mt-1 text-xs text-brand-muted">{description}</p> : null}
+      <div className="flex gap-2">
+        <input
+          value={saisie}
+          onChange={(e) => setSaisie(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              ajouter();
+            }
+          }}
+          placeholder={placeholder}
+          className={`${CHAMP} flex-1`}
+        />
+        <button type="button" onClick={ajouter} className="shrink-0 rounded-xl border border-brand-line px-4 text-sm font-semibold text-brand-ink">
+          Ajouter
+        </button>
+      </div>
+      {valeurs.length > 0 ? (
+        <div className="flex flex-wrap gap-2">
+          {valeurs.map((v) => (
+            <span key={v} className="flex items-center gap-1.5 rounded-full bg-[#F5F7FA] px-3 py-1.5 text-xs text-brand-ink">
+              {v}
+              <button type="button" onClick={() => onChange(valeurs.filter((v2) => v2 !== v))} aria-label={`Retirer ${v}`} className="text-brand-muted">
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      ) : null}
+    </Champ>
+  );
+}
+
 export function ChampsBoutiqueProduit({
   valeurs,
   onChange,
   token,
+  commissionOrdispace,
 }: {
   valeurs: ChampsBoutique;
   onChange: (valeurs: ChampsBoutique) => void;
   token: string | null;
+  /** Marge Ordi'Space = prix_vente − prix, calculée côté backend. Informatif uniquement, non éditable. */
+  commissionOrdispace?: number | null;
 }) {
   const [localites, setLocalites] = useState<{ id: number; nom: string }[] | null>(null);
 
@@ -213,6 +287,35 @@ export function ChampsBoutiqueProduit({
           <ChampTexte libelle="Prix barré (référence)" suffixe="CFA" type="number" valeur={valeurs.prixBarre} onChange={(v) => maj({ prixBarre: v })} />
           <ChampTexte libelle="Réduction affichée" suffixe="%" type="number" valeur={valeurs.reduction} onChange={(v) => maj({ reduction: v })} />
           <ChampTexte libelle="Commission du livreur" suffixe="CFA" type="number" valeur={valeurs.commissionRevente} onChange={(v) => maj({ commissionRevente: v })} />
+        </div>
+
+        {commissionOrdispace !== null && commissionOrdispace !== undefined ? (
+          <div className="flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3">
+            <p className="text-xs font-medium text-blue-700">Commission Ordi&apos;Space (prix de vente − prix)</p>
+            <p className="text-sm font-bold text-blue-700">{formaterPrix(commissionOrdispace)} CFA</p>
+          </div>
+        ) : null}
+      </section>
+
+      <section className="flex flex-col gap-4 border-t border-brand-line pt-5">
+        <div>
+          <p className="text-sm font-bold text-brand-ink">Cadeaux &amp; Pack complet</p>
+          <p className="text-xs text-brand-muted">Deux listes distinctes : les cadeaux (incitation marketing) et le contenu matériel du carton.</p>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <ChampTags
+            libelle="Cadeaux"
+            placeholder="Ex. Souris"
+            valeurs={valeurs.cadeaux}
+            onChange={(v) => maj({ cadeaux: v })}
+          />
+          <ChampTags
+            libelle="Pack complet"
+            placeholder="Ex. Sacoche de transport"
+            valeurs={valeurs.contenuPack}
+            onChange={(v) => maj({ contenuPack: v })}
+          />
         </div>
       </section>
 

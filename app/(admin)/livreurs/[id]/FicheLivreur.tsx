@@ -4,7 +4,14 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
-import { formaterDate, formaterPrix, type LivreurDetailAdmin, type MissionLivreurAdmin } from "@/lib/types";
+import {
+  formaterDate,
+  formaterPrix,
+  type CommandeBoutiqueAdmin,
+  type LivreurDetailAdmin,
+  type MissionLivreurAdmin,
+  type ReponseCommandesBoutiqueAdmin,
+} from "@/lib/types";
 import { ChevronLeftIcon, LivreursIcon, PhoneIcon } from "@/components/icons";
 import { PageHero } from "@/components/PageHero";
 
@@ -17,10 +24,18 @@ const LIBELLE_STATUT_LIVRAISON: Record<string, string> = {
   echouee: "Échouée",
 };
 
+const LIBELLE_STATUT_VENTE_BOUTIQUE: Record<CommandeBoutiqueAdmin["statut"], string> = {
+  en_attente: "À valider",
+  en_cours: "En cours",
+  livree: "Livrée",
+  annulee: "Annulée",
+};
+
 export function FicheLivreur({ livreurId }: { livreurId: number }) {
   const { token } = useAuth();
   const [detail, setDetail] = useState<LivreurDetailAdmin | null>(null);
   const [missions, setMissions] = useState<MissionLivreurAdmin[] | null>(null);
+  const [ventesBoutique, setVentesBoutique] = useState<ReponseCommandesBoutiqueAdmin | null>(null);
 
   useEffect(() => {
     if (!token) return;
@@ -31,6 +46,13 @@ export function FicheLivreur({ livreurId }: { livreurId: number }) {
       setDetail(d);
       setMissions(m);
     });
+  }, [token, livreurId]);
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch<ReponseCommandesBoutiqueAdmin>(`/admin/boutique/commandes?livreur_id=${livreurId}&per_page=50`, { token }).then(
+      setVentesBoutique
+    );
   }, [token, livreurId]);
 
   return (
@@ -85,6 +107,44 @@ export function FicheLivreur({ livreurId }: { livreurId: number }) {
                 ) : null}
               </div>
             </div>
+          ))
+        )}
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <p className="text-sm font-bold text-brand-ink">Ventes Boutique (affiliation)</p>
+          {ventesBoutique ? (
+            <p className="text-xs text-brand-muted">
+              {formaterPrix(ventesBoutique.stats.commission_acquise)} CFA de commission acquise
+            </p>
+          ) : null}
+        </div>
+        <p className="text-xs text-brand-muted">
+          Commandes apportées par ce livreur via son lien/QR affilié — distinctes des missions de livraison ci-dessus.
+        </p>
+        {ventesBoutique === null ? (
+          <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
+        ) : ventesBoutique.commandes.data.length === 0 ? (
+          <p className="py-10 text-center text-sm text-brand-muted">Aucune vente boutique apportée par ce livreur.</p>
+        ) : (
+          ventesBoutique.commandes.data.map((vente) => (
+            <Link
+              key={vente.id}
+              href={`/clients/commandes/${vente.commande_id}`}
+              className="flex items-center justify-between rounded-2xl border border-brand-line bg-white p-4 text-sm"
+            >
+              <div>
+                <p className="font-bold text-brand-ink">{vente.nom_produit ?? `Commande #${vente.commande_id}`}</p>
+                <p className="text-xs text-brand-muted">
+                  {vente.client} · {formaterDate(vente.date)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs font-semibold text-orange-500">+{formaterPrix(vente.commission)} CFA</p>
+                <p className="text-[11px] text-brand-muted">{LIBELLE_STATUT_VENTE_BOUTIQUE[vente.statut]}</p>
+              </div>
+            </Link>
           ))
         )}
       </div>

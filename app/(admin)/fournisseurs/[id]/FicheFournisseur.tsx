@@ -6,9 +6,11 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
 import {
   formaterDate,
+  formaterDateHeure,
   formaterPrix,
   type FournisseurDetailAdmin,
   type Pagination,
+  type PaiementsGlobalFournisseurAdmin,
   type PortefeuilleFournisseurAdmin,
   type StatistiquesFournisseurAdmin,
 } from "@/lib/types";
@@ -27,7 +29,13 @@ const ONGLETS = [
   { id: "apercu", label: "Aperçu" },
   { id: "commandes", label: "Commandes" },
   { id: "portefeuille", label: "Portefeuille" },
+  { id: "paiements", label: "Paiements" },
 ] as const;
+
+const LIBELLE_TYPE_PAIEMENT: Record<"achat_externe" | "transaction", string> = {
+  achat_externe: "Achat externe (commission due)",
+  transaction: "Vente in-app (crédit)",
+};
 
 export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
   const { token } = useAuth();
@@ -37,6 +45,7 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
   const [ventes, setVentes] = useState<StatistiquesFournisseurAdmin | null>(null);
   const [commandes, setCommandes] = useState<CommandeFournisseur[] | null>(null);
   const [portefeuille, setPortefeuille] = useState<PortefeuilleFournisseurAdmin | null>(null);
+  const [paiements, setPaiements] = useState<PaiementsGlobalFournisseurAdmin | null>(null);
   const [referencePaiement, setReferencePaiement] = useState("");
   const [enCours, setEnCours] = useState(false);
 
@@ -62,6 +71,11 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
     if (!token || onglet !== "portefeuille" || portefeuille !== null) return;
     apiFetch<PortefeuilleFournisseurAdmin>(`/fournisseurs/${fournisseurId}/portefeuille?periode=tout`, { token }).then(setPortefeuille);
   }, [token, onglet, portefeuille, fournisseurId]);
+
+  useEffect(() => {
+    if (!token || onglet !== "paiements" || paiements !== null) return;
+    apiFetch<PaiementsGlobalFournisseurAdmin>(`/fournisseurs/${fournisseurId}/paiements?periode=tout`, { token }).then(setPaiements);
+  }, [token, onglet, paiements, fournisseurId]);
 
   async function payerTout() {
     if (!token || !referencePaiement.trim() || enCours) return;
@@ -248,6 +262,59 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
                     <p className="font-semibold text-brand-ink">{formaterPrix(t.montant)} CFA</p>
                     <p className={`text-xs ${t.statut === "paye" ? "text-green-600" : "text-orange-600"}`}>
                       {t.statut === "paye" ? "Payé" : "En attente"}
+                    </p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {onglet === "paiements" ? (
+        <div className="flex flex-col gap-4">
+          <p className="text-xs text-brand-muted">
+            Vue fusionnée, tous produits confondus : les achats externes déclarés par le fournisseur (commission qu&apos;il doit à
+            Ordi&apos;Space) et les crédits de portefeuille (ventes in-app qu&apos;Ordi&apos;Space lui doit) — identique à ce que le
+            fournisseur voit dans son propre onglet « Paiement ».
+          </p>
+
+          <div className="grid grid-cols-3 gap-4">
+            <div className="rounded-2xl border border-brand-line bg-white p-4">
+              <p className="text-xl font-extrabold text-brand-ink">{paiements ? `${formaterPrix(paiements.total_a_payer)} CFA` : "—"}</p>
+              <p className="text-xs text-brand-muted">À payer (achats externes)</p>
+            </div>
+            <div className="rounded-2xl border border-brand-line bg-white p-4">
+              <p className="text-xl font-extrabold text-brand-ink">{paiements ? `${formaterPrix(paiements.total_a_recevoir)} CFA` : "—"}</p>
+              <p className="text-xs text-brand-muted">À recevoir (ventes in-app)</p>
+            </div>
+            <div className="rounded-2xl border border-brand-line bg-white p-4">
+              <p className="text-xl font-extrabold text-brand-ink">{paiements ? `${formaterPrix(paiements.total_paye)} CFA` : "—"}</p>
+              <p className="text-xs text-brand-muted">Déjà payé (les deux flux)</p>
+            </div>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            {paiements === null ? (
+              <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
+            ) : paiements.items.length === 0 ? (
+              <p className="py-10 text-center text-sm text-brand-muted">Aucun paiement.</p>
+            ) : (
+              paiements.items.map((item) => (
+                <div key={`${item.type}-${item.id}`} className="flex items-center justify-between rounded-2xl border border-brand-line bg-white p-4 text-sm">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <p className="font-bold text-brand-ink">{item.nom_produit ?? (item.type === "achat_externe" ? `Achat #${item.id}` : `Vente #${item.id}`)}</p>
+                      <span className="rounded-full bg-[#F5F7FA] px-2 py-0.5 text-[10px] font-semibold text-brand-muted">
+                        {LIBELLE_TYPE_PAIEMENT[item.type]}
+                      </span>
+                    </div>
+                    <p className="text-xs text-brand-muted">{formaterDateHeure(item.date_heure)}</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-brand-ink">{formaterPrix(item.montant)} CFA</p>
+                    <p className={`text-xs ${item.statut === "paye" ? "text-green-600" : "text-orange-600"}`}>
+                      {item.statut === "paye" ? "Payé" : "En attente"}
                     </p>
                   </div>
                 </div>

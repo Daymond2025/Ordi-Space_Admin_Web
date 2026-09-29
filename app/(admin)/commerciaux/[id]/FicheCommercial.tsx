@@ -4,18 +4,38 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
-import { formaterPrix, type CommercialDetailAdmin } from "@/lib/types";
+import { formaterDate, formaterPrix, type CommandeCommercialAdmin, type CommercialDetailAdmin, type Pagination } from "@/lib/types";
 import { ChevronLeftIcon, CommerciauxIcon, PhoneIcon } from "@/components/icons";
 import { PageHero } from "@/components/PageHero";
+
+const LIBELLE_STATUT_COMMANDE: Record<string, string> = {
+  en_attente: "En attente",
+  validee: "Validée",
+  en_preparation: "En préparation",
+  en_livraison: "En livraison",
+  livree: "Livrée",
+  annulee: "Annulée",
+  reportee: "Reportée",
+  client_injoignable: "Client injoignable",
+  numero_incorrect: "Numéro incorrect",
+};
 
 export function FicheCommercial({ commercialId }: { commercialId: number }) {
   const { token } = useAuth();
   const [detail, setDetail] = useState<CommercialDetailAdmin | null>(null);
+  const [commandes, setCommandes] = useState<CommandeCommercialAdmin[] | null>(null);
   const [enCours, setEnCours] = useState(false);
 
   useEffect(() => {
     if (!token) return;
     apiFetch<CommercialDetailAdmin>(`/coordinateur/commerciaux/${commercialId}`, { token }).then(setDetail);
+  }, [token, commercialId]);
+
+  useEffect(() => {
+    if (!token) return;
+    apiFetch<Pagination<CommandeCommercialAdmin>>(`/coordinateur/commerciaux/${commercialId}/commandes?per_page=50`, { token }).then((page) =>
+      setCommandes(page.data)
+    );
   }, [token, commercialId]);
 
   async function basculerActif() {
@@ -80,6 +100,34 @@ export function FicheCommercial({ commercialId }: { commercialId: number }) {
       ) : (
         <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
       )}
+
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-bold text-brand-ink">Commandes saisies</p>
+        {commandes === null ? (
+          <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
+        ) : commandes.length === 0 ? (
+          <p className="py-10 text-center text-sm text-brand-muted">Aucune commande.</p>
+        ) : (
+          commandes.map((c) => (
+            <Link
+              key={c.commande_id}
+              href={`/clients/commandes/${c.commande_id}`}
+              className="flex items-center justify-between rounded-2xl border border-brand-line bg-white p-4 text-sm"
+            >
+              <div>
+                <p className="font-bold text-brand-ink">{c.nom_produit ?? `Commande #${c.commande_id}`}</p>
+                <p className="text-xs text-brand-muted">
+                  {c.nom_client} · {formaterDate(c.date_commande)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="font-semibold text-brand-ink">{formaterPrix(c.montant_total)} CFA</p>
+                <p className="text-xs text-brand-muted">{LIBELLE_STATUT_COMMANDE[c.statut] ?? c.statut}</p>
+              </div>
+            </Link>
+          ))
+        )}
+      </div>
     </div>
   );
 }

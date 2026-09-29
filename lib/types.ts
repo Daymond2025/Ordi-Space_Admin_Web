@@ -82,6 +82,12 @@ export type Produit = {
   prix_barre: string | null;
   pourcentage_reduction: number | null;
   frais_livraison?: { montant: string; localite: { id: number; nom: string } | null }[];
+  /** Incitation marketing (liste prédéfinie côté mobile). */
+  cadeaux: string[] | null;
+  /** Contenu matériel du carton — distinct de `cadeaux`. */
+  contenu_pack: string[] | null;
+  /** Marge Ordi'Space = prix_vente − prix, calculée côté backend — null tant que non publié. */
+  commission_ordispace: number | null;
 };
 
 export const LIBELLE_STATUT_PRODUIT: Record<StatutProduit, string> = {
@@ -800,6 +806,32 @@ export type PortefeuilleFournisseurAdmin = {
   transactions: { data: TransactionPortefeuilleAdmin[] };
 };
 
+/**
+ * Ligne fusionnée d'un achat externe (commission due PAR le fournisseur) ou
+ * d'un crédit portefeuille (versement Ordi'Space AU fournisseur) — miroir de
+ * GET /fournisseur/moi/paiements, ici consulté sur GET
+ * /fournisseurs/{id}/paiements pour un fournisseur précis.
+ */
+export type PaiementFournisseurAdmin = {
+  type: "achat_externe" | "transaction";
+  id: number;
+  produit_id: number | null;
+  commande_id: number | null;
+  nom_produit: string | null;
+  photo: string | null;
+  montant: number;
+  statut: string;
+  date_heure: string;
+};
+
+export type PaiementsGlobalFournisseurAdmin = {
+  solde: number;
+  total_a_payer: number;
+  total_paye: number;
+  total_a_recevoir: number;
+  items: PaiementFournisseurAdmin[];
+};
+
 // --- Espace Coordinateur — Livreurs (miroir GET /coordinateur/livreurs*) ----------
 
 export type LivreurAdmin = {
@@ -874,6 +906,16 @@ export type CommercialDetailAdmin = {
   nom_entreprise: string | null;
   localisation: string | null;
   statistiques: { commandes_total: number; commandes_validees: number; commandes_annulees: number; commission_totale: number };
+};
+
+/** Ligne de GET /coordinateur/commerciaux/{id}/commandes (CommercialController::commandes()). */
+export type CommandeCommercialAdmin = {
+  commande_id: number;
+  nom_produit: string | null;
+  nom_client: string;
+  statut: StatutCommande;
+  montant_total: number;
+  date_commande: string;
 };
 
 // --- Espace Coordinateur — Réclamations (miroir GET /reclamations, 5 entités) ----------

@@ -36,6 +36,10 @@ export function DeclarationDetail({ id }: { id: string }) {
   const [technicienId, setTechnicienId] = useState("");
   const [dateRdv, setDateRdv] = useState("");
   const [lieu, setLieu] = useState("");
+  // Par défaut, le formulaire modifie le 1er rendez-vous (comportement
+  // historique) ; ce mode force une création, pour planifier une visite
+  // supplémentaire (ex. le 1er rendez-vous n'a pas suffi à résoudre la panne).
+  const [modeNouveauRdv, setModeNouveauRdv] = useState(false);
 
   function recharger() {
     if (!token) return;
@@ -76,12 +80,19 @@ export function DeclarationDetail({ id }: { id: string }) {
     }
   }
 
+  function planifierNouveauRdv() {
+    setModeNouveauRdv(true);
+    setTechnicienId("");
+    setDateRdv("");
+    setLieu("");
+  }
+
   async function enregistrerRendezVous() {
     if (!token || !demande) return;
     setErreur(null);
     setChargement(true);
 
-    const rdvExistant = demande.rendez_vous[0];
+    const rdvExistant = !modeNouveauRdv ? demande.rendez_vous[0] : undefined;
     const corps = {
       technicien_id: technicienId ? Number(technicienId) : null,
       date_rdv: dateRdv,
@@ -94,6 +105,7 @@ export function DeclarationDetail({ id }: { id: string }) {
       } else {
         await apiFetch(`/sav/demandes/${id}/rendez-vous`, { method: "POST", token, body: corps });
       }
+      setModeNouveauRdv(false);
       recharger();
     } catch (e) {
       setErreur(e instanceof ApiRequestError ? e.message : "Impossible d'enregistrer le rendez-vous.");
@@ -172,7 +184,28 @@ export function DeclarationDetail({ id }: { id: string }) {
         </div>
 
         <div className="flex flex-col gap-4 rounded-2xl border border-brand-line bg-white p-6">
-          <p className="text-sm font-bold text-brand-ink">{rdv ? "Rendez-vous planifié" : "Assigner un technicien"}</p>
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-bold text-brand-ink">
+              {modeNouveauRdv ? "Nouveau rendez-vous" : rdv ? "1er rendez-vous planifié" : "Assigner un technicien"}
+            </p>
+            {rdv && !modeNouveauRdv ? (
+              <button type="button" onClick={planifierNouveauRdv} className="text-xs font-semibold text-[color:var(--brand-blue-end)] underline underline-offset-2">
+                + Planifier un nouveau rendez-vous
+              </button>
+            ) : null}
+            {modeNouveauRdv ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setModeNouveauRdv(false);
+                  recharger();
+                }}
+                className="text-xs font-semibold text-brand-muted underline underline-offset-2"
+              >
+                Annuler
+              </button>
+            ) : null}
+          </div>
 
           <div className="flex flex-col gap-1.5">
             <label className="text-xs font-medium text-brand-muted">Technicien</label>
@@ -211,7 +244,7 @@ export function DeclarationDetail({ id }: { id: string }) {
             disabled={chargement || !dateRdv}
             className="bg-gradient-brand-blue mt-1 flex h-11 items-center justify-center rounded-xl text-sm font-semibold text-white disabled:opacity-50"
           >
-            {rdv ? "Mettre à jour le rendez-vous" : "Planifier le rendez-vous"}
+            {rdv && !modeNouveauRdv ? "Mettre à jour le rendez-vous" : "Planifier le rendez-vous"}
           </button>
 
           {rdv?.intervention ? (
@@ -222,6 +255,32 @@ export function DeclarationDetail({ id }: { id: string }) {
           ) : null}
         </div>
       </div>
+
+      {demande.rendez_vous.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          <p className="text-sm font-bold text-brand-ink">
+            Historique des rendez-vous ({demande.rendez_vous.length})
+          </p>
+          {demande.rendez_vous.map((r) => (
+            <Link
+              key={r.id}
+              href={`/clients/maintenance/${r.id}`}
+              className="flex items-center justify-between rounded-2xl border border-brand-line bg-white p-4 text-sm"
+            >
+              <div>
+                <p className="font-semibold text-brand-ink">{formaterDateHeure(r.date_rdv)}</p>
+                <p className="text-xs text-brand-muted">
+                  {r.technicien ? `${r.technicien.user.prenom ? r.technicien.user.prenom + " " : ""}${r.technicien.user.nom}` : "Technicien non assigné"}
+                  {r.lieu ? ` · ${r.lieu}` : ""}
+                </p>
+              </div>
+              <span className="text-xs font-semibold text-brand-muted">
+                {r.intervention ? LIBELLE_STATUT_INTERVENTION[r.intervention.statut_intervention] : "Sans intervention"}
+              </span>
+            </Link>
+          ))}
+        </div>
+      ) : null}
     </div>
   );
 }

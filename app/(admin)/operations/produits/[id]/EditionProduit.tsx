@@ -280,7 +280,7 @@ export function EditionProduit({ id }: { id: string }) {
             </div>
           </div>
 
-          <ChampsBoutiqueProduit valeurs={boutique} onChange={setBoutique} token={token} />
+          <ChampsBoutiqueProduit valeurs={boutique} onChange={setBoutique} token={token} commissionOrdispace={produit.commission_ordispace} />
 
           <button type="submit" disabled={chargement} className="bg-gradient-brand-blue mt-2 flex h-11 items-center justify-center rounded-xl text-sm font-semibold text-white disabled:opacity-60">
             {chargement ? "Enregistrement…" : "Enregistrer"}
