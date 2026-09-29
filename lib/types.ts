@@ -1086,3 +1086,83 @@ export type ReponseConfirmations = {
   stats: { en_attente: number; confirme: number; echoue: number; anomalie: number; encaisse: number };
   confirmations: Pagination<ConfirmationSuivi>;
 };
+
+// --- Discussion produit (GET /produits/{id}/conversation) — miroir Fournisseur/Coordinateur ----------
+
+export function formaterMontant(valeur: number): string {
+  return `${Math.round(valeur).toLocaleString("fr-FR")} CFA`;
+}
+
+/** Résumé de suivi le plus récent (journal d'audit) affiché sous une carte commande du fil. */
+export type DernierSuivi = { texte: string; acteur: string; date: string };
+
+export type CommandeCarte = {
+  commande_id: number;
+  photo: string | null;
+  nom_produit: string;
+  description: string | null;
+  nom_client: string;
+  zone_localite: string | null;
+  telephone: string | null;
+  derniere_action: string;
+  statut: string;
+  nouvelles_activites: number;
+  dernier_suivi: DernierSuivi | null;
+};
+
+export type MessageAuteur = {
+  id: number;
+  nom: string;
+  prenom: string | null;
+  type_utilisateur: string;
+  telephone?: string | null;
+};
+
+export type TypeMessage = "texte" | "image" | "video" | "audio" | "note_vocale" | "document" | "rapport" | "commande_creee" | "proposition_prix";
+
+export type DonneesCommandeCreee = {
+  nom_produit: string;
+  photo: string | null;
+  prix_produit: number;
+  nom_client: string;
+  telephone: string | null;
+  zone_livraison: string | null;
+  date_livraison_prevue: string | null;
+  frais_livraison: number;
+  remise: number;
+  total: number;
+  bonus_offerts: string | null;
+  notes?: string | null;
+};
+
+export type DonneesRapport = {
+  date: string;
+  envoyees: number;
+  validees: number;
+  reportees: number;
+  non_livre: number;
+  annulees: number;
+};
+
+export type DonneesPropositionPrix = { prix_liste: number; prix_propose: number };
+
+export type MessageConversation = {
+  id: number;
+  produit_id: number | null;
+  commande_id: number | null;
+  auteur_id: number;
+  auteur: MessageAuteur;
+  type: TypeMessage;
+  contenu: string | null;
+  fichier: string | null;
+  donnees: DonneesCommandeCreee | DonneesRapport | DonneesPropositionPrix | null;
+  date_envoi: string;
+};
+
+export type ItemFil =
+  | { type: "message"; date: string; donnee: MessageConversation }
+  | { type: "commande"; date: string; donnee: CommandeCarte };
+
+export type EnTeteConversation = { recues: number; livrees: number; annulees: number; en_cours: number };
+
+export type ConversationProduit = { items: ItemFil[]; en_tete: EnTeteConversation };

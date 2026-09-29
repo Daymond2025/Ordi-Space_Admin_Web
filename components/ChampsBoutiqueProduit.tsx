@@ -211,19 +211,114 @@ function ChampTags({
   );
 }
 
-export function ChampsBoutiqueProduit({
-  valeurs,
-  onChange,
-  token,
-  commissionOrdispace,
-}: {
+type ProprietesSection = {
   valeurs: ChampsBoutique;
   onChange: (valeurs: ChampsBoutique) => void;
-  token: string | null;
+};
+
+/**
+ * "Caractéristiques" — extrait de ChampsBoutiqueProduit pour être composable
+ * indépendamment (assistant multi-étapes de création, écran d'édition en un
+ * seul bloc via ChampsBoutiqueProduit ci-dessous).
+ */
+export function SectionCaracteristiques({ valeurs, onChange }: ProprietesSection) {
+  const maj = (patch: Partial<ChampsBoutique>) => onChange({ ...valeurs, ...patch });
+
+  return (
+    <section className="flex flex-col gap-4">
+      <div>
+        <p className="text-sm font-bold text-brand-ink">Caractéristiques</p>
+        <p className="text-xs text-brand-muted">
+          La marque, la RAM, le stockage et la taille alimentent les filtres de l&apos;écran « Catégorie » des livreurs.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Champ libelle="Marque">
+          <input list="marques-produit" value={valeurs.marque} onChange={(e) => maj({ marque: e.target.value })} className={CHAMP} placeholder="Déduite du nom si vide" />
+          <datalist id="marques-produit">
+            {MARQUES_SUGGEREES.map((m) => (
+              <option key={m} value={m} />
+            ))}
+          </datalist>
+        </Champ>
+        <ChampTexte libelle="Processeur" valeur={valeurs.processeur} onChange={(v) => maj({ processeur: v })} />
+        <ChampTexte libelle="Mémoire (RAM)" valeur={valeurs.ram} onChange={(v) => maj({ ram: v })} />
+        <ChampTexte libelle="Stockage" valeur={valeurs.stockage} onChange={(v) => maj({ stockage: v })} />
+        <ChampTexte libelle="Taille d'écran" valeur={valeurs.taille} onChange={(v) => maj({ taille: v })} />
+        <ChampTexte libelle="Système d'exploitation" valeur={valeurs.systeme} onChange={(v) => maj({ systeme: v })} />
+        <ChampTexte libelle="Carte graphique" valeur={valeurs.carteGraphique} onChange={(v) => maj({ carteGraphique: v })} />
+        <ChampTexte libelle="Couleur" valeur={valeurs.couleur} onChange={(v) => maj({ couleur: v })} />
+      </div>
+    </section>
+  );
+}
+
+export function SectionVente({
+  valeurs,
+  onChange,
+  commissionOrdispace,
+}: ProprietesSection & {
   /** Marge Ordi'Space = prix_vente − prix, calculée côté backend. Informatif uniquement, non éditable. */
   commissionOrdispace?: number | null;
 }) {
+  const maj = (patch: Partial<ChampsBoutique>) => onChange({ ...valeurs, ...patch });
+
+  return (
+    <section className="flex flex-col gap-4">
+      <div>
+        <p className="text-sm font-bold text-brand-ink">Vente par les livreurs</p>
+        <p className="text-xs text-brand-muted">
+          Sans prix de vente, la Boutique affiche « Prix à venir » ; sans commission, le produit n&apos;est pas proposé à la revente.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <Champ libelle="État du produit">
+          <Listbox value={valeurs.etat} onChange={(v) => maj({ etat: v })} options={ETATS} />
+        </Champ>
+        <ChampTexte libelle="Prix de vente" suffixe="CFA" type="number" valeur={valeurs.prixVente} onChange={(v) => maj({ prixVente: v })} />
+        <ChampTexte libelle="Prix barré (référence)" suffixe="CFA" type="number" valeur={valeurs.prixBarre} onChange={(v) => maj({ prixBarre: v })} />
+        <ChampTexte libelle="Réduction affichée" suffixe="%" type="number" valeur={valeurs.reduction} onChange={(v) => maj({ reduction: v })} />
+        <ChampTexte libelle="Commission du livreur" suffixe="CFA" type="number" valeur={valeurs.commissionRevente} onChange={(v) => maj({ commissionRevente: v })} />
+      </div>
+
+      {commissionOrdispace !== null && commissionOrdispace !== undefined ? (
+        <div className="flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3">
+          <p className="text-xs font-medium text-blue-700">Commission Ordi&apos;Space (prix de vente − prix)</p>
+          <p className="text-sm font-bold text-blue-700">{formaterPrix(commissionOrdispace)} CFA</p>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+export function SectionCadeauxPack({ valeurs, onChange }: ProprietesSection) {
+  const maj = (patch: Partial<ChampsBoutique>) => onChange({ ...valeurs, ...patch });
+
+  return (
+    <section className="flex flex-col gap-4">
+      <div>
+        <p className="text-sm font-bold text-brand-ink">Cadeaux &amp; Pack complet</p>
+        <p className="text-xs text-brand-muted">Deux listes distinctes : les cadeaux (incitation marketing) et le contenu matériel du carton.</p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <ChampTags libelle="Cadeaux" placeholder="Ex. Souris" valeurs={valeurs.cadeaux} onChange={(v) => maj({ cadeaux: v })} />
+        <ChampTags
+          libelle="Pack complet"
+          placeholder="Ex. Sacoche de transport"
+          valeurs={valeurs.contenuPack}
+          onChange={(v) => maj({ contenuPack: v })}
+        />
+      </div>
+    </section>
+  );
+}
+
+export function SectionFraisLivraison({ valeurs, onChange, token }: ProprietesSection & { token: string | null }) {
   const [localites, setLocalites] = useState<{ id: number; nom: string }[] | null>(null);
+  const maj = (patch: Partial<ChampsBoutique>) => onChange({ ...valeurs, ...patch });
 
   useEffect(() => {
     if (!token) return;
@@ -240,115 +335,70 @@ export function ChampsBoutiqueProduit({
     };
   }, [token]);
 
-  const maj = (patch: Partial<ChampsBoutique>) => onChange({ ...valeurs, ...patch });
+  return (
+    <section className="flex flex-col gap-3">
+      <div>
+        <p className="text-sm font-bold text-brand-ink">Frais de livraison</p>
+        <p className="text-xs text-brand-muted">Renseignez les localités livrées — les autres restent indisponibles (commande impossible).</p>
+      </div>
 
+      {localites === null ? (
+        <p className="text-xs text-brand-muted">Chargement des localités…</p>
+      ) : (
+        <div className="grid max-h-80 grid-cols-2 gap-x-6 gap-y-2 overflow-y-auto pr-1">
+          {localites.map((localite) => (
+            <label key={localite.id} className="flex items-center gap-3">
+              <span className="min-w-0 flex-1 truncate text-sm text-brand-ink">{localite.nom}</span>
+              <span className="flex w-32 shrink-0 items-center rounded-xl border border-brand-line px-3">
+                <input
+                  type="number"
+                  min={0}
+                  value={valeurs.frais[localite.id] ?? ""}
+                  onChange={(e) => maj({ frais: { ...valeurs.frais, [localite.id]: e.target.value } })}
+                  placeholder="—"
+                  aria-label={`Frais de livraison ${localite.nom}`}
+                  className="h-9 min-w-0 flex-1 bg-transparent text-right text-sm outline-none"
+                />
+                <span className="ml-1.5 text-[11px] text-brand-muted">CFA</span>
+              </span>
+            </label>
+          ))}
+        </div>
+      )}
+    </section>
+  );
+}
+
+/**
+ * Les 4 sections ci-dessus, enchaînées avec séparateurs — utilisé tel quel
+ * par l'écran d'édition (un seul bloc). L'assistant de création compose
+ * plutôt les sections individuellement, une par étape.
+ */
+export function ChampsBoutiqueProduit({
+  valeurs,
+  onChange,
+  token,
+  commissionOrdispace,
+}: {
+  valeurs: ChampsBoutique;
+  onChange: (valeurs: ChampsBoutique) => void;
+  token: string | null;
+  commissionOrdispace?: number | null;
+}) {
   return (
     <>
-      <section className="flex flex-col gap-4 border-t border-brand-line pt-5">
-        <div>
-          <p className="text-sm font-bold text-brand-ink">Caractéristiques</p>
-          <p className="text-xs text-brand-muted">
-            La marque, la RAM, le stockage et la taille alimentent les filtres de l&apos;écran « Catégorie » des livreurs.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Champ libelle="Marque">
-            <input list="marques-produit" value={valeurs.marque} onChange={(e) => maj({ marque: e.target.value })} className={CHAMP} placeholder="Déduite du nom si vide" />
-            <datalist id="marques-produit">
-              {MARQUES_SUGGEREES.map((m) => (
-                <option key={m} value={m} />
-              ))}
-            </datalist>
-          </Champ>
-          <ChampTexte libelle="Processeur" valeur={valeurs.processeur} onChange={(v) => maj({ processeur: v })} />
-          <ChampTexte libelle="Mémoire (RAM)" valeur={valeurs.ram} onChange={(v) => maj({ ram: v })} />
-          <ChampTexte libelle="Stockage" valeur={valeurs.stockage} onChange={(v) => maj({ stockage: v })} />
-          <ChampTexte libelle="Taille d'écran" valeur={valeurs.taille} onChange={(v) => maj({ taille: v })} />
-          <ChampTexte libelle="Système d'exploitation" valeur={valeurs.systeme} onChange={(v) => maj({ systeme: v })} />
-          <ChampTexte libelle="Carte graphique" valeur={valeurs.carteGraphique} onChange={(v) => maj({ carteGraphique: v })} />
-          <ChampTexte libelle="Couleur" valeur={valeurs.couleur} onChange={(v) => maj({ couleur: v })} />
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-4 border-t border-brand-line pt-5">
-        <div>
-          <p className="text-sm font-bold text-brand-ink">Vente par les livreurs</p>
-          <p className="text-xs text-brand-muted">
-            Sans prix de vente, la Boutique affiche « Prix à venir » ; sans commission, le produit n&apos;est pas proposé à la revente.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <Champ libelle="État du produit">
-            <Listbox value={valeurs.etat} onChange={(v) => maj({ etat: v })} options={ETATS} />
-          </Champ>
-          <ChampTexte libelle="Prix de vente" suffixe="CFA" type="number" valeur={valeurs.prixVente} onChange={(v) => maj({ prixVente: v })} />
-          <ChampTexte libelle="Prix barré (référence)" suffixe="CFA" type="number" valeur={valeurs.prixBarre} onChange={(v) => maj({ prixBarre: v })} />
-          <ChampTexte libelle="Réduction affichée" suffixe="%" type="number" valeur={valeurs.reduction} onChange={(v) => maj({ reduction: v })} />
-          <ChampTexte libelle="Commission du livreur" suffixe="CFA" type="number" valeur={valeurs.commissionRevente} onChange={(v) => maj({ commissionRevente: v })} />
-        </div>
-
-        {commissionOrdispace !== null && commissionOrdispace !== undefined ? (
-          <div className="flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3">
-            <p className="text-xs font-medium text-blue-700">Commission Ordi&apos;Space (prix de vente − prix)</p>
-            <p className="text-sm font-bold text-blue-700">{formaterPrix(commissionOrdispace)} CFA</p>
-          </div>
-        ) : null}
-      </section>
-
-      <section className="flex flex-col gap-4 border-t border-brand-line pt-5">
-        <div>
-          <p className="text-sm font-bold text-brand-ink">Cadeaux &amp; Pack complet</p>
-          <p className="text-xs text-brand-muted">Deux listes distinctes : les cadeaux (incitation marketing) et le contenu matériel du carton.</p>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4">
-          <ChampTags
-            libelle="Cadeaux"
-            placeholder="Ex. Souris"
-            valeurs={valeurs.cadeaux}
-            onChange={(v) => maj({ cadeaux: v })}
-          />
-          <ChampTags
-            libelle="Pack complet"
-            placeholder="Ex. Sacoche de transport"
-            valeurs={valeurs.contenuPack}
-            onChange={(v) => maj({ contenuPack: v })}
-          />
-        </div>
-      </section>
-
-      <section className="flex flex-col gap-3 border-t border-brand-line pt-5">
-        <div>
-          <p className="text-sm font-bold text-brand-ink">Frais de livraison</p>
-          <p className="text-xs text-brand-muted">Renseignez les localités livrées — les autres restent indisponibles (commande impossible).</p>
-        </div>
-
-        {localites === null ? (
-          <p className="text-xs text-brand-muted">Chargement des localités…</p>
-        ) : (
-          <div className="grid max-h-80 grid-cols-2 gap-x-6 gap-y-2 overflow-y-auto pr-1">
-            {localites.map((localite) => (
-              <label key={localite.id} className="flex items-center gap-3">
-                <span className="min-w-0 flex-1 truncate text-sm text-brand-ink">{localite.nom}</span>
-                <span className="flex w-32 shrink-0 items-center rounded-xl border border-brand-line px-3">
-                  <input
-                    type="number"
-                    min={0}
-                    value={valeurs.frais[localite.id] ?? ""}
-                    onChange={(e) => maj({ frais: { ...valeurs.frais, [localite.id]: e.target.value } })}
-                    placeholder="—"
-                    aria-label={`Frais de livraison ${localite.nom}`}
-                    className="h-9 min-w-0 flex-1 bg-transparent text-right text-sm outline-none"
-                  />
-                  <span className="ml-1.5 text-[11px] text-brand-muted">CFA</span>
-                </span>
-              </label>
-            ))}
-          </div>
-        )}
-      </section>
+      <div className="border-t border-brand-line pt-5">
+        <SectionCaracteristiques valeurs={valeurs} onChange={onChange} />
+      </div>
+      <div className="border-t border-brand-line pt-5">
+        <SectionVente valeurs={valeurs} onChange={onChange} commissionOrdispace={commissionOrdispace} />
+      </div>
+      <div className="border-t border-brand-line pt-5">
+        <SectionCadeauxPack valeurs={valeurs} onChange={onChange} />
+      </div>
+      <div className="border-t border-brand-line pt-5">
+        <SectionFraisLivraison valeurs={valeurs} onChange={onChange} token={token} />
+      </div>
     </>
   );
 }

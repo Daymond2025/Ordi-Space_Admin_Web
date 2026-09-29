@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
@@ -27,8 +28,10 @@ const ONGLETS: { id: StatutProduit | "tous" | "indisponible"; label: string }[] 
 
 export default function ProduitsPage() {
   const { token } = useAuth();
+  const searchParams = useSearchParams();
+  const ongletInitial = ONGLETS.find((o) => o.id === searchParams.get("statut"))?.id ?? "tous";
   const [produits, setProduits] = useState<Produit[] | null>(null);
-  const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]["id"]>("tous");
+  const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]["id"]>(ongletInitial);
   const [fournisseurId, setFournisseurId] = useState<number | "tous">("tous");
   const [enCoursBoost, setEnCoursBoost] = useState<number | null>(null);
 

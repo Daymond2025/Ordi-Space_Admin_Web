@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { LIBELLE_FAMILLE_CATEGORIE, type Categorie, type FamilleCategorie } from "@/lib/types";
-import { OperationsIcon, PencilIcon, PlusIcon, XIcon } from "@/components/icons";
+import { ChevronLeftIcon, OperationsIcon, PencilIcon, PlusIcon, XIcon } from "@/components/icons";
 import { Listbox } from "@/components/Listbox";
 import { PageHero } from "@/components/PageHero";
 
@@ -14,6 +14,14 @@ const OPTIONS_FAMILLE = [
   { value: "accessoires", label: "Accessoires" },
   { value: "logiciels", label: "Logiciels" },
 ];
+
+const PAR_PAGE = 10;
+
+const STYLE_FAMILLE: Record<FamilleCategorie, string> = {
+  ordinateur: "bg-blue-50 text-[color:var(--brand-blue-end)]",
+  accessoires: "bg-emerald-50 text-emerald-600",
+  logiciels: "bg-violet-50 text-violet-600",
+};
 
 type Brouillon = { nom: string; famille: string; groupe: string; libelle: string; ordre: string };
 
@@ -133,6 +141,7 @@ export default function CategoriesPage() {
   const [categories, setCategories] = useState<Categorie[] | null>(null);
   // `undefined` = fermé ; `null` = nouvelle catégorie ; sinon la catégorie à modifier.
   const [edition, setEdition] = useState<Categorie | null | undefined>(undefined);
+  const [page, setPage] = useState(1);
 
   useEffect(() => {
     if (!token) return;
@@ -148,6 +157,14 @@ export default function CategoriesPage() {
   }
 
   const dansLeFiltre = categories?.filter((c) => c.famille && c.ordre_filtre !== null).length;
+
+  const dernierePage = categories ? Math.max(1, Math.ceil(categories.length / PAR_PAGE)) : 1;
+  const pageAffichee = Math.min(page, dernierePage);
+  const categoriesPage = useMemo(() => {
+    if (!categories) return [];
+    const debut = (pageAffichee - 1) * PAR_PAGE;
+    return categories.slice(debut, debut + PAR_PAGE);
+  }, [categories, pageAffichee]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -173,37 +190,83 @@ export default function CategoriesPage() {
 
       {categories === null ? (
         <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
+      ) : categories.length === 0 ? (
+        <p className="py-10 text-center text-sm text-brand-muted">Aucune catégorie pour l&apos;instant.</p>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-brand-line bg-white">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-[#F7F9FC] text-xs uppercase tracking-wide text-brand-muted">
-              <tr>
-                <th className="px-4 py-3 font-semibold">Catégorie</th>
-                <th className="px-4 py-3 font-semibold">Famille</th>
-                <th className="px-4 py-3 font-semibold">Section</th>
-                <th className="px-4 py-3 font-semibold">Tuile</th>
-                <th className="px-4 py-3 text-right font-semibold">Ordre</th>
-                <th className="w-12 px-4 py-3" />
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((c) => (
-                <tr key={c.id} className="border-t border-brand-line">
-                  <td className="px-4 py-3 font-semibold text-brand-ink">{c.nom_categorie}</td>
-                  <td className="px-4 py-3 text-brand-ink">{c.famille ? LIBELLE_FAMILLE_CATEGORIE[c.famille as FamilleCategorie] : <span className="text-brand-muted">—</span>}</td>
-                  <td className="px-4 py-3 text-brand-muted">{c.groupe ?? "—"}</td>
-                  <td className="px-4 py-3 text-brand-muted">{c.ordre_filtre !== null ? (c.libelle ?? c.nom_categorie) : "—"}</td>
-                  <td className="px-4 py-3 text-right text-brand-muted">{c.ordre_filtre ?? "—"}</td>
-                  <td className="px-4 py-3">
-                    <button type="button" onClick={() => setEdition(c)} aria-label={`Modifier ${c.nom_categorie}`} className="flex h-8 w-8 items-center justify-center rounded-full text-brand-muted hover:bg-brand-line/60">
-                      <PencilIcon className="h-4 w-4" />
-                    </button>
-                  </td>
+        <>
+          <div className="overflow-hidden rounded-2xl border border-brand-line bg-white">
+            <table className="w-full text-left text-sm">
+              <thead className="bg-gradient-brand-blue text-xs uppercase tracking-wide text-white">
+                <tr>
+                  <th className="px-4 py-3.5 font-semibold">Catégorie</th>
+                  <th className="px-4 py-3.5 font-semibold">Famille</th>
+                  <th className="px-4 py-3.5 font-semibold">Section</th>
+                  <th className="px-4 py-3.5 font-semibold">Tuile</th>
+                  <th className="px-4 py-3.5 text-right font-semibold">Ordre</th>
+                  <th className="w-12 px-4 py-3.5" />
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+              </thead>
+              <tbody>
+                {categoriesPage.map((c, i) => (
+                  <tr key={c.id} className={`transition-colors hover:bg-blue-50/50 ${i % 2 === 1 ? "bg-[#F7F9FC]" : "bg-white"}`}>
+                    <td className="px-4 py-3.5 font-semibold text-brand-ink">{c.nom_categorie}</td>
+                    <td className="px-4 py-3.5">
+                      {c.famille ? (
+                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${STYLE_FAMILLE[c.famille as FamilleCategorie]}`}>
+                          {LIBELLE_FAMILLE_CATEGORIE[c.famille as FamilleCategorie]}
+                        </span>
+                      ) : (
+                        <span className="text-brand-muted">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5 text-brand-muted">{c.groupe ?? "—"}</td>
+                    <td className="px-4 py-3.5 text-brand-muted">{c.ordre_filtre !== null ? (c.libelle ?? c.nom_categorie) : "—"}</td>
+                    <td className="px-4 py-3.5 text-right">
+                      {c.ordre_filtre !== null ? (
+                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-brand-line px-1.5 text-xs font-bold text-brand-ink">
+                          {c.ordre_filtre}
+                        </span>
+                      ) : (
+                        <span className="text-brand-muted">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <button type="button" onClick={() => setEdition(c)} aria-label={`Modifier ${c.nom_categorie}`} className="flex h-8 w-8 items-center justify-center rounded-full text-brand-muted hover:bg-brand-line/60">
+                        <PencilIcon className="h-4 w-4" />
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {dernierePage > 1 ? (
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-brand-muted">
+                Page {pageAffichee} sur {dernierePage} — {categories.length} catégories
+              </p>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={pageAffichee <= 1}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-brand-line text-brand-muted disabled:opacity-40"
+                >
+                  <ChevronLeftIcon className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPage((p) => Math.min(dernierePage, p + 1))}
+                  disabled={pageAffichee >= dernierePage}
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-brand-line text-brand-muted disabled:opacity-40"
+                >
+                  <ChevronLeftIcon className="h-4 w-4 rotate-180" />
+                </button>
+              </div>
+            </div>
+          ) : null}
+        </>
       )}
 
       {edition !== undefined && token ? (

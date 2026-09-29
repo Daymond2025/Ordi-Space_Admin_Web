@@ -395,3 +395,12 @@ export function MailIcon(props: SVGProps<SVGSVGElement>) {
     </svg>
   );
 }
+
+/** Discussion produit — bouton d'envoi de la barre de saisie. */
+export function SendIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+      <path d="M3.4 20.6l18.2-8.6-18.2-8.6L3 9.5 15 12 3 14.5l.4 6.1Z" />
+    </svg>
+  );
+}

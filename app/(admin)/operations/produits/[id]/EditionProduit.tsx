@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -11,7 +12,7 @@ import {
   type Categorie,
   type Produit,
 } from "@/lib/types";
-import { ChevronLeftIcon, TrashIcon } from "@/components/icons";
+import { ChatIcon, ChevronLeftIcon, TrashIcon } from "@/components/icons";
 import { Listbox } from "@/components/Listbox";
 import { AjoutCategorieRapide } from "@/components/AjoutCategorieRapide";
 import {
@@ -176,6 +177,13 @@ export function EditionProduit({ id }: { id: string }) {
         </div>
 
         <div className="flex gap-2">
+          <Link
+            href={`/operations/produits/${produit.id}/conversation`}
+            className="flex h-9 items-center gap-1.5 rounded-full border border-brand-line px-4 text-xs font-semibold text-brand-ink"
+          >
+            <ChatIcon className="h-3.5 w-3.5" />
+            Voir la conversation
+          </Link>
           {peutValider ? (
             <>
               <button type="button" onClick={() => decider("valide")} className="h-9 rounded-full bg-emerald-500 px-4 text-xs font-semibold text-white">
