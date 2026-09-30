@@ -1,5 +1,5 @@
-import { GrilleCartesVides } from "@/components/GrilleCartesVides";
+import { DashboardGeneral } from "./DashboardGeneral";
 
 export default function DashboardPage() {
-  return <GrilleCartesVides />;
+  return <DashboardGeneral />;
 }

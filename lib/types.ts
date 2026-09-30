@@ -1207,3 +1207,45 @@ export type CoordinateurDetailAdmin = CoordinateurAdmin & {
   horaires: string | null;
   statistiques: { commandes_validees: number; produits_valides: number; activites: number };
 };
+
+// --- Dashboard général (GET /admin/statistiques/tableau-de-bord) ----------
+
+export type TableauDeBordGeneral = {
+  utilisateurs: {
+    total: number;
+    clients: number;
+    fournisseurs: number;
+    livreurs: number;
+    coordinateurs: number;
+    commerciaux: number;
+    nouveaux_7j: number;
+  };
+  commandes: {
+    total: number;
+    aujourd_hui: number;
+    en_attente: number;
+    en_cours: number;
+    livrees: number;
+    annulees: number;
+  };
+  finance: {
+    chiffre_affaires_total: number;
+    chiffre_affaires_mois: number;
+    fournisseurs_solde_du: number;
+    retraits_en_attente_montant: number;
+  };
+  a_traiter: {
+    produits_a_valider: number;
+    reclamations_nouvelles: number;
+    pannes_en_attente: number;
+    retraits_en_attente: number;
+  };
+  catalogue: {
+    total: number;
+    valides: number;
+    stock_faible: number;
+    indisponibles: number;
+    categories: number;
+  };
+  inscriptions_7j: { jour: string; total: number }[];
+};
