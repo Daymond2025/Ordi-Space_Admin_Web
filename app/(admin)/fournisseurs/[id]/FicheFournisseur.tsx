@@ -3,19 +3,24 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { apiFetch } from "@/lib/api";
+import { ApiRequestError, apiFetch } from "@/lib/api";
 import {
   formaterDate,
   formaterDateHeure,
   formaterPrix,
+  LIBELLE_STATUT_COMPTE,
+  STYLE_STATUT_COMPTE,
   type FournisseurDetailAdmin,
   type Pagination,
   type PaiementsGlobalFournisseurAdmin,
   type PortefeuilleFournisseurAdmin,
   type StatistiquesFournisseurAdmin,
+  type UtilisateurAdmin,
 } from "@/lib/types";
-import { ChevronLeftIcon, FournisseursIcon, MailIcon, PhoneIcon } from "@/components/icons";
+import { ChevronLeftIcon, FournisseursIcon, MailIcon, PencilIcon, PhoneIcon } from "@/components/icons";
 import { PageHero } from "@/components/PageHero";
+
+const CHAMP = "h-10 rounded-xl border border-brand-line px-3 text-sm";
 
 type CommandeFournisseur = {
   commande_id: number;
@@ -49,16 +54,81 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
   const [referencePaiement, setReferencePaiement] = useState("");
   const [enCours, setEnCours] = useState(false);
 
-  useEffect(() => {
+  const [utilisateur, setUtilisateur] = useState<UtilisateurAdmin | null>(null);
+  const [edition, setEdition] = useState(false);
+  const [brouillon, setBrouillon] = useState({
+    nom: "", prenom: "", email: "", telephone: "",
+    nomEntreprise: "", adresseEntreprise: "", contactPro: "", nomGerant: "", telephoneGerant: "", horairesOuverture: "", zoneCouverte: "",
+  });
+  const [erreurEdition, setErreurEdition] = useState<string | null>(null);
+
+  function charger() {
     if (!token) return;
     Promise.all([
       apiFetch<FournisseurDetailAdmin>(`/fournisseurs/${fournisseurId}`, { token }),
       apiFetch<StatistiquesFournisseurAdmin>(`/fournisseurs/${fournisseurId}/statistiques?periode=tout`, { token }),
-    ]).then(([d, s]) => {
+      apiFetch<UtilisateurAdmin>(`/admin/utilisateurs/${fournisseurId}`, { token }),
+    ]).then(([d, s, u]) => {
       setDetail(d);
       setVentes(s);
+      setUtilisateur(u);
+      setBrouillon({
+        nom: u.nom, prenom: u.prenom ?? "", email: u.email ?? "", telephone: u.telephone ?? "",
+        nomEntreprise: d.fournisseur.nom_entreprise, adresseEntreprise: d.fournisseur.adresse_entreprise ?? "",
+        contactPro: d.fournisseur.contact_pro ?? "", nomGerant: d.fournisseur.nom_gerant ?? "",
+        telephoneGerant: d.fournisseur.telephone_gerant ?? "", horairesOuverture: d.fournisseur.horaires_ouverture ?? "",
+        zoneCouverte: d.fournisseur.zone_couverte ?? "",
+      });
     });
-  }, [token, fournisseurId]);
+  }
+
+  useEffect(charger, [token, fournisseurId]);
+
+  async function enregistrerIdentite() {
+    if (!token) return;
+    setErreurEdition(null);
+    setEnCours(true);
+    try {
+      await apiFetch(`/admin/utilisateurs/${fournisseurId}`, {
+        method: "PATCH",
+        token,
+        body: { nom: brouillon.nom, prenom: brouillon.prenom || null, email: brouillon.email, telephone: brouillon.telephone || null },
+      });
+      await apiFetch(`/fournisseurs/${fournisseurId}/profil`, {
+        method: "PATCH",
+        token,
+        body: {
+          nom_entreprise: brouillon.nomEntreprise,
+          adresse_entreprise: brouillon.adresseEntreprise || null,
+          contact_pro: brouillon.contactPro || null,
+          nom_gerant: brouillon.nomGerant || null,
+          telephone_gerant: brouillon.telephoneGerant || null,
+          horaires_ouverture: brouillon.horairesOuverture || null,
+          zone_couverte: brouillon.zoneCouverte || null,
+        },
+      });
+      setEdition(false);
+      charger();
+    } catch (e) {
+      setErreurEdition(e instanceof ApiRequestError ? e.message : "Impossible d'enregistrer ces modifications.");
+    } finally {
+      setEnCours(false);
+    }
+  }
+
+  async function basculerStatut() {
+    if (!token || !utilisateur) return;
+    const nouveauStatut = utilisateur.statut_compte === "actif" ? "desactive" : "actif";
+    if (nouveauStatut === "desactive" && !confirm("Désactiver ce compte fournisseur ? Il ne pourra plus se connecter.")) return;
+
+    setEnCours(true);
+    try {
+      await apiFetch(`/admin/utilisateurs/${fournisseurId}/statut`, { method: "PATCH", token, body: { statut_compte: nouveauStatut } });
+      charger();
+    } finally {
+      setEnCours(false);
+    }
+  }
 
   useEffect(() => {
     if (!token || onglet !== "commandes" || commandes !== null) return;
@@ -118,19 +188,152 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
         }
       />
 
-      {fournisseur ? (
-        <div className="flex flex-wrap gap-4 rounded-2xl border border-brand-line bg-white p-4 text-sm text-brand-muted">
-          {fournisseur.contact_pro ? (
-            <span className="flex items-center gap-1.5">
-              <PhoneIcon className="h-4 w-4" /> {fournisseur.contact_pro}
-            </span>
-          ) : null}
-          {fournisseur.user.email ? (
-            <span className="flex items-center gap-1.5">
-              <MailIcon className="h-4 w-4" /> {fournisseur.user.email}
-            </span>
-          ) : null}
-          {fournisseur.nom_gerant ? <span>Gérant : {fournisseur.nom_gerant}</span> : null}
+      {erreurEdition ? <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{erreurEdition}</p> : null}
+
+      {fournisseur && utilisateur ? (
+        <div className="rounded-2xl border border-brand-line bg-white p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <p className="text-sm font-bold text-brand-ink">Informations</p>
+              <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${STYLE_STATUT_COMPTE[utilisateur.statut_compte]}`}>
+                {LIBELLE_STATUT_COMPTE[utilisateur.statut_compte]}
+              </span>
+            </div>
+            <div className="flex gap-2">
+              {!edition ? (
+                <button
+                  type="button"
+                  onClick={() => setEdition(true)}
+                  className="flex h-9 items-center gap-1.5 rounded-full border border-brand-line px-3.5 text-xs font-semibold text-brand-ink"
+                >
+                  <PencilIcon className="h-3.5 w-3.5" />
+                  Modifier
+                </button>
+              ) : null}
+              <button
+                type="button"
+                onClick={basculerStatut}
+                disabled={enCours}
+                className={`h-9 rounded-full px-3.5 text-xs font-semibold disabled:opacity-50 ${
+                  utilisateur.statut_compte === "actif" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
+                }`}
+              >
+                {utilisateur.statut_compte === "actif" ? "Désactiver" : "Réactiver"}
+              </button>
+            </div>
+          </div>
+
+          {!edition ? (
+            <div className="mt-3 flex flex-wrap gap-4 text-sm text-brand-muted">
+              {fournisseur.contact_pro ? (
+                <span className="flex items-center gap-1.5">
+                  <PhoneIcon className="h-4 w-4" /> {fournisseur.contact_pro}
+                </span>
+              ) : null}
+              {fournisseur.user.email ? (
+                <span className="flex items-center gap-1.5">
+                  <MailIcon className="h-4 w-4" /> {fournisseur.user.email}
+                </span>
+              ) : null}
+              {fournisseur.nom_gerant ? <span>Gérant : {fournisseur.nom_gerant}</span> : null}
+              {fournisseur.adresse_entreprise ? <span>{fournisseur.adresse_entreprise}</span> : null}
+            </div>
+          ) : (
+            <div className="mt-4 flex flex-col gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <input value={brouillon.nom} onChange={(e) => setBrouillon((b) => ({ ...b, nom: e.target.value }))} placeholder="Nom" className={CHAMP} />
+                <input
+                  value={brouillon.prenom}
+                  onChange={(e) => setBrouillon((b) => ({ ...b, prenom: e.target.value }))}
+                  placeholder="Prénom"
+                  className={CHAMP}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  type="email"
+                  value={brouillon.email}
+                  onChange={(e) => setBrouillon((b) => ({ ...b, email: e.target.value }))}
+                  placeholder="E-mail"
+                  className={CHAMP}
+                />
+                <input
+                  value={brouillon.telephone}
+                  onChange={(e) => setBrouillon((b) => ({ ...b, telephone: e.target.value }))}
+                  placeholder="Téléphone"
+                  className={CHAMP}
+                />
+              </div>
+              <input
+                value={brouillon.nomEntreprise}
+                onChange={(e) => setBrouillon((b) => ({ ...b, nomEntreprise: e.target.value }))}
+                placeholder="Nom de l'entreprise"
+                className={CHAMP}
+              />
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  value={brouillon.contactPro}
+                  onChange={(e) => setBrouillon((b) => ({ ...b, contactPro: e.target.value }))}
+                  placeholder="Contact pro"
+                  className={CHAMP}
+                />
+                <input
+                  value={brouillon.zoneCouverte}
+                  onChange={(e) => setBrouillon((b) => ({ ...b, zoneCouverte: e.target.value }))}
+                  placeholder="Zone couverte"
+                  className={CHAMP}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  value={brouillon.nomGerant}
+                  onChange={(e) => setBrouillon((b) => ({ ...b, nomGerant: e.target.value }))}
+                  placeholder="Nom du gérant"
+                  className={CHAMP}
+                />
+                <input
+                  value={brouillon.telephoneGerant}
+                  onChange={(e) => setBrouillon((b) => ({ ...b, telephoneGerant: e.target.value }))}
+                  placeholder="Téléphone du gérant"
+                  className={CHAMP}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <input
+                  value={brouillon.adresseEntreprise}
+                  onChange={(e) => setBrouillon((b) => ({ ...b, adresseEntreprise: e.target.value }))}
+                  placeholder="Adresse"
+                  className={CHAMP}
+                />
+                <input
+                  value={brouillon.horairesOuverture}
+                  onChange={(e) => setBrouillon((b) => ({ ...b, horairesOuverture: e.target.value }))}
+                  placeholder="Horaires d'ouverture"
+                  className={CHAMP}
+                />
+              </div>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEdition(false);
+                    charger();
+                  }}
+                  className="h-10 flex-1 rounded-full border border-brand-line text-xs font-semibold text-brand-muted"
+                >
+                  Annuler
+                </button>
+                <button
+                  type="button"
+                  onClick={enregistrerIdentite}
+                  disabled={enCours}
+                  className="bg-gradient-brand-blue h-10 flex-1 rounded-full text-xs font-semibold text-white disabled:opacity-60"
+                >
+                  {enCours ? "Enregistrement…" : "Enregistrer"}
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       ) : null}
 

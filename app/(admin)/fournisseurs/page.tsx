@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { formaterDate, formaterPrix, type FournisseurAdmin, type Pagination } from "@/lib/types";
-import { FournisseursIcon, SearchIcon } from "@/components/icons";
+import { FournisseursIcon, PlusIcon, SearchIcon } from "@/components/icons";
 import { PageHero } from "@/components/PageHero";
+import { ModaleProvisionnerUtilisateur } from "@/components/ModaleProvisionnerUtilisateur";
 
 /**
  * Miroir admin du "Centre des opérations" de Cordinateur_App_Web — l'Admin
@@ -15,8 +17,10 @@ import { PageHero } from "@/components/PageHero";
  */
 export default function FournisseursPage() {
   const { token } = useAuth();
+  const router = useRouter();
   const [fournisseurs, setFournisseurs] = useState<FournisseurAdmin[] | null>(null);
   const [recherche, setRecherche] = useState("");
+  const [modaleOuverte, setModaleOuverte] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -42,7 +46,26 @@ export default function FournisseursPage() {
           { valeur: fournisseurs?.length ?? "—", label: "Total" },
           { valeur: `${formaterPrix(montantTotalEnAttente)} CFA`, label: "En attente de paiement" },
         ]}
+        action={
+          <button
+            type="button"
+            onClick={() => setModaleOuverte(true)}
+            className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-[color:var(--brand-blue-end)] shadow-sm"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Nouveau fournisseur
+          </button>
+        }
       />
+
+      {modaleOuverte && token ? (
+        <ModaleProvisionnerUtilisateur
+          role="fournisseur"
+          token={token}
+          onClose={() => setModaleOuverte(false)}
+          onCree={(id) => router.push(`/fournisseurs/${id}`)}
+        />
+      ) : null}
 
       <div className="relative w-80">
         <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-brand-muted" />

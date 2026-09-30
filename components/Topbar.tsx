@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { BellIcon, SearchIcon } from "./icons";
+import { NotificationsBell } from "./NotificationsBell";
+import { SearchIcon } from "./icons";
 
 export function Topbar({
   titre,
@@ -58,12 +59,7 @@ export function Topbar({
           </button>
         )}
 
-        <button type="button" aria-label="Notifications" className="relative flex h-11 w-11 items-center justify-center rounded-full bg-white">
-          <BellIcon className="h-5 w-5 text-amber-500" />
-          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">
-            2
-          </span>
-        </button>
+        <NotificationsBell />
       </div>
     </header>
   );

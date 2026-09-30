@@ -856,8 +856,11 @@ export type LivreurDetailAdmin = {
   user_id: number;
   nom: string;
   prenom: string | null;
+  email: string | null;
   telephone: string | null;
   disponible: boolean;
+  type_vehicule: string | null;
+  zone_couverture: string | null;
   statistiques: StatistiquesLivreurAdmin;
 };
 
@@ -1166,3 +1169,41 @@ export type ItemFil =
 export type EnTeteConversation = { recues: number; livrees: number; annulees: number; en_cours: number };
 
 export type ConversationProduit = { items: ItemFil[]; en_tete: EnTeteConversation };
+
+// --- Notifications (GET/PATCH /moi/notifications — générique à tout rôle, voir MoiController) ----------
+
+export type NotificationAdmin = {
+  id: number;
+  type_notification: string;
+  titre: string;
+  contenu: string;
+  lu: boolean;
+  date_envoi: string;
+};
+
+/** Où renvoyer l'admin selon le type de notification (NotificationAdminService côté backend). */
+export const LIEN_TYPE_NOTIFICATION: Record<string, string> = {
+  produit_a_valider: "/operations/produits?statut=en_attente",
+  reclamation: "/clients/reclamations",
+  panne_declaree: "/maintenance",
+  retrait_demande: "/livreurs/retraits",
+};
+
+// --- Coordinateurs (CRUD admin, GET/PATCH /admin/coordinateurs* — Admin\CoordinateurController) ----------
+
+export type CoordinateurAdmin = {
+  user_id: number;
+  nom: string;
+  prenom: string | null;
+  email: string | null;
+  telephone: string | null;
+  statut_compte: StatutCompte;
+  zone_couverte: string | null;
+  membre_depuis: string;
+};
+
+export type CoordinateurDetailAdmin = CoordinateurAdmin & {
+  adresse: string | null;
+  horaires: string | null;
+  statistiques: { commandes_validees: number; produits_valides: number; activites: number };
+};

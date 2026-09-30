@@ -106,6 +106,10 @@ export const SECTIONS_SECONDAIRES: Record<string, SectionSecondaire> = {
     racine: { label: "Tableau de bord", href: "/coordinateurs" },
     groupes: [
       {
+        label: "Gestion coordinateurs",
+        elements: [{ label: "Liste des coordinateurs", href: "/coordinateurs/liste" }],
+      },
+      {
         label: "Suivi du Coordinateur",
         elements: [{ label: "Réclamations", href: "/coordinateurs/reclamations" }],
       },

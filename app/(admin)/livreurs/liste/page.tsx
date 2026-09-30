@@ -1,12 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
 import type { LivreurAdmin } from "@/lib/types";
-import { LivreursIcon, SearchIcon } from "@/components/icons";
+import { LivreursIcon, PlusIcon, SearchIcon } from "@/components/icons";
 import { PageHero } from "@/components/PageHero";
+import { ModaleProvisionnerUtilisateur } from "@/components/ModaleProvisionnerUtilisateur";
 
 const ONGLETS = [
   { id: "tous", label: "Tous" },
@@ -21,9 +23,11 @@ const ONGLETS = [
  */
 export default function LivreursListePage() {
   const { token } = useAuth();
+  const router = useRouter();
   const [livreurs, setLivreurs] = useState<LivreurAdmin[] | null>(null);
   const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]["id"]>("tous");
   const [recherche, setRecherche] = useState("");
+  const [modaleOuverte, setModaleOuverte] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -53,7 +57,26 @@ export default function LivreursListePage() {
           { valeur: livreurs?.length ?? "—", label: "Total" },
           { valeur: disponibles, label: "Disponibles" },
         ]}
+        action={
+          <button
+            type="button"
+            onClick={() => setModaleOuverte(true)}
+            className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-white px-4 text-sm font-semibold text-[color:var(--brand-blue-end)] shadow-sm"
+          >
+            <PlusIcon className="h-4 w-4" />
+            Nouveau livreur
+          </button>
+        }
       />
+
+      {modaleOuverte && token ? (
+        <ModaleProvisionnerUtilisateur
+          role="livreur"
+          token={token}
+          onClose={() => setModaleOuverte(false)}
+          onCree={(id) => router.push(`/livreurs/${id}`)}
+        />
+      ) : null}
 
       <div className="flex items-center justify-between gap-4">
         <div className="flex gap-2">
