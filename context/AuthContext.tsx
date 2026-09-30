@@ -11,7 +11,29 @@ export type Utilisateur = {
   type_utilisateur: string;
   roles: string[];
   permissions: string[];
+  // Uniquement pour type_utilisateur === "administrateur" ; null sinon.
+  est_super_admin: boolean | null;
+  espaces_autorises: string[] | null;
 };
+
+// Les 10 espaces qu'un super-admin peut accorder/retirer à un admin
+// restreint — cf. ESPACES_ADMIN côté backend (app/Helpers/const.php).
+export const ESPACES_ADMIN = [
+  "operations", "commandes", "clients", "commerciaux", "fournisseurs",
+  "livreurs", "maintenance", "coordinateurs", "finance", "reports",
+] as const;
+
+export type EspaceAdmin = (typeof ESPACES_ADMIN)[number];
+
+export function estSuperAdmin(user: Utilisateur | null): boolean {
+  return user?.type_utilisateur === "administrateur" && (user.est_super_admin ?? true);
+}
+
+export function peutAccederEspace(user: Utilisateur | null, espace: EspaceAdmin): boolean {
+  if (!user || user.type_utilisateur !== "administrateur") return true;
+  if (user.est_super_admin ?? true) return true;
+  return (user.espaces_autorises ?? []).includes(espace);
+}
 
 type SessionResult = { user: Utilisateur; token: string };
 

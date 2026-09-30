@@ -1,4 +1,5 @@
 import type { ComponentType, SVGProps } from "react";
+import type { EspaceAdmin } from "@/context/AuthContext";
 import {
   BagIcon,
   ClientsIcon,
@@ -17,20 +18,23 @@ export type NavItem = {
   href: string;
   label: string;
   icon: ComponentType<SVGProps<SVGSVGElement>>;
+  // Absent = toujours visible (le Dashboard général) ; sinon doit figurer
+  // dans les espaces_autorises d'un admin restreint pour apparaître.
+  espace?: EspaceAdmin;
 };
 
 export const NAV_ITEMS: NavItem[] = [
   { href: "/", label: "Dashboard", icon: DashboardIcon },
-  { href: "/operations", label: "Operations", icon: OperationsIcon },
-  { href: "/commandes", label: "Commandes", icon: BagIcon },
-  { href: "/clients", label: "Clients", icon: ClientsIcon },
-  { href: "/commerciaux", label: "Commerciaux", icon: CommerciauxIcon },
-  { href: "/fournisseurs", label: "Fournisseurs", icon: FournisseursIcon },
-  { href: "/livreurs", label: "Livreurs", icon: LivreursIcon },
-  { href: "/maintenance", label: "Maintenance", icon: MaintenanceServiceIcon },
-  { href: "/coordinateurs", label: "Coordinateurs", icon: CoordinateursIcon },
-  { href: "/finance", label: "Finance", icon: FinanceIcon },
-  { href: "/reports", label: "Reports", icon: ReportsIcon },
+  { href: "/operations", label: "Operations", icon: OperationsIcon, espace: "operations" },
+  { href: "/commandes", label: "Commandes", icon: BagIcon, espace: "commandes" },
+  { href: "/clients", label: "Clients", icon: ClientsIcon, espace: "clients" },
+  { href: "/commerciaux", label: "Commerciaux", icon: CommerciauxIcon, espace: "commerciaux" },
+  { href: "/fournisseurs", label: "Fournisseurs", icon: FournisseursIcon, espace: "fournisseurs" },
+  { href: "/livreurs", label: "Livreurs", icon: LivreursIcon, espace: "livreurs" },
+  { href: "/maintenance", label: "Maintenance", icon: MaintenanceServiceIcon, espace: "maintenance" },
+  { href: "/coordinateurs", label: "Coordinateurs", icon: CoordinateursIcon, espace: "coordinateurs" },
+  { href: "/finance", label: "Finance", icon: FinanceIcon, espace: "finance" },
+  { href: "/reports", label: "Reports", icon: ReportsIcon, espace: "reports" },
 ];
 
 export type SousElementSecondaire = {

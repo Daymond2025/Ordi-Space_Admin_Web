@@ -2,12 +2,15 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { peutAccederEspace, useAuth } from "@/context/AuthContext";
 import { NAV_ITEMS } from "@/lib/nav";
 import { SettingsIcon } from "./icons";
 
 export function PrimarySidebar() {
   const pathname = usePathname();
+  const { user } = useAuth();
   const estActif = (href: string) => (href === "/" ? pathname === "/" : pathname.startsWith(href));
+  const itemsVisibles = NAV_ITEMS.filter((item) => !item.espace || peutAccederEspace(user, item.espace));
 
   return (
     <aside className="flex h-full w-[236px] shrink-0 flex-col border-r border-brand-line bg-white">
@@ -18,7 +21,7 @@ export function PrimarySidebar() {
 
       <nav className="flex-1 px-3">
         <ul className="flex flex-col gap-1">
-          {NAV_ITEMS.map((item) => {
+          {itemsVisibles.map((item) => {
             const actif = estActif(item.href);
             const Icon = item.icon;
 

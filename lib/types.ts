@@ -272,13 +272,16 @@ export type StatsFidelite = {
 
 // --- Réclamations (reclamations) ------------------------------------------
 
-export type StatutReclamation = "nouvelle" | "en_cours" | "resolue" | "rejetee";
+// "annulee" = l'auteur a lui-même retiré sa réclamation (bouton "Annuler"
+// côté client), distinct de "rejetee" qui est une décision du staff.
+export type StatutReclamation = "nouvelle" | "en_cours" | "resolue" | "rejetee" | "annulee";
 
 export const LIBELLE_STATUT_RECLAMATION: Record<StatutReclamation, string> = {
   nouvelle: "Nouvelle",
   en_cours: "En cours",
   resolue: "Résolue",
   rejetee: "Rejetée",
+  annulee: "Annulée",
 };
 
 export const STYLE_STATUT_RECLAMATION: Record<StatutReclamation, string> = {
@@ -286,6 +289,7 @@ export const STYLE_STATUT_RECLAMATION: Record<StatutReclamation, string> = {
   en_cours: "bg-amber-100 text-amber-600",
   resolue: "bg-emerald-100 text-emerald-600",
   rejetee: "bg-brand-line text-brand-muted",
+  annulee: "bg-slate-200 text-slate-600",
 };
 
 export type ReclamationAdmin = {
@@ -936,7 +940,7 @@ export type ReclamationCoordinateurAdmin = {
   sujet: string;
   titre: string;
   description: string;
-  statut: "nouvelle" | "en_cours" | "resolue" | "rejetee";
+  statut: "nouvelle" | "en_cours" | "resolue" | "rejetee" | "annulee";
   date_reclamation: string;
   auteur: AuteurReclamationAdmin;
 };
@@ -1248,4 +1252,20 @@ export type TableauDeBordGeneral = {
     categories: number;
   };
   inscriptions_7j: { jour: string; total: number }[];
+};
+
+// --- Settings > Administrateurs (GET/POST/PATCH /admin/administrateurs) ---
+
+export type AdministrateurAdmin = {
+  id: number;
+  nom: string;
+  prenom: string | null;
+  email: string;
+  telephone: string | null;
+  statut_compte: StatutCompte;
+  created_at: string;
+  administrateur: {
+    est_super_admin: boolean;
+    espaces_autorises: string[] | null;
+  };
 };

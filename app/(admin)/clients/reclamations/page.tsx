@@ -20,6 +20,7 @@ const OPTIONS_STATUT_FILTRE = [
   { value: "en_cours", label: "En cours" },
   { value: "resolue", label: "Résolue" },
   { value: "rejetee", label: "Rejetée" },
+  { value: "annulee", label: "Annulée" },
 ];
 
 const OPTIONS_STATUT_REPONSE = [

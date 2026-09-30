@@ -14,6 +14,7 @@ const ONGLETS_STATUT: { id: StatutReclamation | "tous"; label: string }[] = [
   { id: "en_cours", label: "Prise en charge" },
   { id: "resolue", label: "Résolue" },
   { id: "rejetee", label: "Rejetée" },
+  { id: "annulee", label: "Annulée" },
 ];
 
 const ENTITES: { id: string | "toutes"; label: string }[] = [
@@ -58,7 +59,7 @@ export default function ReclamationsCoordinateurPage() {
     return {
       nouvelle: reclamations.filter((r) => r.statut === "nouvelle").length,
       en_cours: reclamations.filter((r) => r.statut === "en_cours").length,
-      terminee: reclamations.filter((r) => r.statut === "resolue" || r.statut === "rejetee").length,
+      terminee: reclamations.filter((r) => r.statut === "resolue" || r.statut === "rejetee" || r.statut === "annulee").length,
     };
   }, [reclamations]);
 
