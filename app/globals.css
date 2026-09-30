@@ -33,4 +33,51 @@ body {
   .bg-gradient-brand-blue {
     background-image: linear-gradient(135deg, var(--brand-blue-end), var(--brand-blue-start));
   }
+
+  @keyframes dash-fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  .animate-dash-fade-in-up {
+    animation: dash-fade-in-up 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+
+  @keyframes dash-pulse-ring {
+    0% {
+      box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45);
+    }
+    70% {
+      box-shadow: 0 0 0 9px rgba(245, 158, 11, 0);
+    }
+    100% {
+      box-shadow: 0 0 0 0 rgba(245, 158, 11, 0);
+    }
+  }
+  .animate-dash-pulse-ring {
+    animation: dash-pulse-ring 2.2s ease-out infinite;
+  }
+
+  @keyframes dash-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+  .animate-dash-spin {
+    animation: dash-spin 0.7s linear infinite;
+  }
+
+  @keyframes dash-grow-y {
+    from {
+      transform: scaleY(0);
+    }
+    to {
+      transform: scaleY(1);
+    }
+  }
 }
