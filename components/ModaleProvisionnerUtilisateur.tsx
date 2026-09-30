@@ -1,9 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ApiRequestError, apiFetch } from "@/lib/api";
 import { Listbox } from "@/components/Listbox";
-import { XIcon } from "@/components/icons";
+import { UserAvatarIcon, XIcon } from "@/components/icons";
 
 const CHAMP = "h-11 rounded-xl border border-brand-line px-3 text-sm";
 
@@ -49,29 +49,50 @@ export function ModaleProvisionnerUtilisateur({
   const [nomEntreprise, setNomEntreprise] = useState("");
   const [typeVehicule, setTypeVehicule] = useState("");
   const [zoneCouverture, setZoneCouverture] = useState("");
+  const [photo, setPhoto] = useState<File | null>(null);
+  const [apercuPhoto, setApercuPhoto] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const inputPhotoRef = useRef<HTMLInputElement>(null);
 
   const pretAEnvoyer = nom.trim() && email.trim() && motDePasse.trim() && (role !== "fournisseur" || nomEntreprise.trim());
+
+  // Aperçu en data: URL (FileReader), pas un object URL "blob:" — la CSP de
+  // l'app (next.config.ts) n'autorise que 'self'/data: en img-src.
+  function choisirPhoto(fichier: File | undefined) {
+    if (!fichier) return;
+    setPhoto(fichier);
+    const lecteur = new FileReader();
+    lecteur.onload = () => setApercuPhoto(typeof lecteur.result === "string" ? lecteur.result : null);
+    lecteur.readAsDataURL(fichier);
+  }
 
   async function creer() {
     setErreur(null);
     setEnCours(true);
     try {
-      const utilisateur = await apiFetch<{ id: number }>("/admin/utilisateurs", {
-        method: "POST",
-        token,
-        body: {
-          nom,
-          prenom: prenom || null,
-          email,
-          telephone: telephone || null,
-          password: motDePasse,
-          type_utilisateur: role,
-          ...(role === "fournisseur" ? { nom_entreprise: nomEntreprise } : {}),
-          ...(role === "livreur" ? { type_vehicule: typeVehicule || null, zone_couverture: zoneCouverture || null } : {}),
-        },
-      });
+      const champs: Record<string, string | null> = {
+        nom,
+        prenom: prenom || null,
+        email,
+        telephone: telephone || null,
+        password: motDePasse,
+        type_utilisateur: role,
+        ...(role === "fournisseur" ? { nom_entreprise: nomEntreprise } : {}),
+        ...(role === "livreur" ? { type_vehicule: typeVehicule || null, zone_couverture: zoneCouverture || null } : {}),
+      };
+
+      let body: unknown = champs;
+      if (photo) {
+        const formData = new FormData();
+        for (const [cle, valeur] of Object.entries(champs)) {
+          if (valeur !== null) formData.append(cle, valeur);
+        }
+        formData.append("photo", photo);
+        body = formData;
+      }
+
+      const utilisateur = await apiFetch<{ id: number }>("/admin/utilisateurs", { method: "POST", token, body });
       onCree(utilisateur.id);
     } catch (e) {
       setErreur(e instanceof ApiRequestError ? e.message : `Impossible de créer ce ${LIBELLE_ROLE[role]}.`);
@@ -95,6 +116,28 @@ export function ModaleProvisionnerUtilisateur({
         </p>
 
         {erreur ? <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-600">{erreur}</p> : null}
+
+        <div className="mt-4 flex justify-center">
+          <button
+            type="button"
+            onClick={() => inputPhotoRef.current?.click()}
+            className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#EEF1F6] text-brand-muted"
+            aria-label="Ajouter une photo de profil"
+          >
+            {apercuPhoto ? (
+              // eslint-disable-next-line @next/next/no-img-element -- aperçu local (blob:), non pris en charge par next/image
+              <img src={apercuPhoto} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <UserAvatarIcon className="h-7 w-7" />
+            )}
+            <span className="bg-gradient-brand-blue absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full text-white ring-2 ring-white">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" className="h-2.5 w-2.5">
+                <path d="M12 6v12M6 12h12" />
+              </svg>
+            </span>
+          </button>
+          <input ref={inputPhotoRef} type="file" accept="image/*" className="hidden" onChange={(e) => choisirPhoto(e.target.files?.[0])} />
+        </div>
 
         <div className="mt-4 flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-3">
