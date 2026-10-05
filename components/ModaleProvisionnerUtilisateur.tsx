@@ -118,18 +118,22 @@ export function ModaleProvisionnerUtilisateur({
         {erreur ? <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-600">{erreur}</p> : null}
 
         <div className="mt-4 flex justify-center">
+          {/* overflow-hidden ne s'applique qu'au cercle intérieur (photo) :
+              posé directement sur le bouton, il rognait aussi le badge "+". */}
           <button
             type="button"
             onClick={() => inputPhotoRef.current?.click()}
-            className="relative flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#EEF1F6] text-brand-muted"
+            className="relative flex h-16 w-16 items-center justify-center"
             aria-label="Ajouter une photo de profil"
           >
-            {apercuPhoto ? (
-              // eslint-disable-next-line @next/next/no-img-element -- aperçu local (blob:), non pris en charge par next/image
-              <img src={apercuPhoto} alt="" className="h-full w-full object-cover" />
-            ) : (
-              <UserAvatarIcon className="h-7 w-7" />
-            )}
+            <span className="flex h-16 w-16 items-center justify-center overflow-hidden rounded-full bg-[#EEF1F6] text-brand-muted">
+              {apercuPhoto ? (
+                // eslint-disable-next-line @next/next/no-img-element -- aperçu local (blob:), non pris en charge par next/image
+                <img src={apercuPhoto} alt="" className="h-full w-full object-cover" />
+              ) : (
+                <UserAvatarIcon className="h-7 w-7" />
+              )}
+            </span>
             <span className="bg-gradient-brand-blue absolute bottom-0 right-0 flex h-5 w-5 items-center justify-center rounded-full text-white ring-2 ring-white">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" className="h-2.5 w-2.5">
                 <path d="M12 6v12M6 12h12" />
