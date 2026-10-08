@@ -146,8 +146,16 @@ export const SECTIONS_SECONDAIRES: Record<string, SectionSecondaire> = {
   "/commerciaux": {
     titre: "Commerciaux",
     rechercheLabel: "Recherche commerciaux",
-    racine: { label: "Liste des commerciaux", href: "/commerciaux" },
+    racine: { label: "Tableau de bord", href: "/commerciaux" },
     groupes: [
+      {
+        label: "Gestion commerciaux",
+        elements: [{ label: "Liste des commerciaux", href: "/commerciaux/liste" }],
+      },
+      {
+        label: "Paiements",
+        elements: [{ label: "Retraits", href: "/commerciaux/retraits" }],
+      },
       {
         label: "Outils",
         elements: [{ label: "Réponses rapides", href: "/commerciaux/reponses-rapides" }],

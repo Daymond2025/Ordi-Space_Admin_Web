@@ -378,6 +378,23 @@ export const LIBELLE_STATUT_RETOUR: Record<string, string> = {
   effectue: "Retour effectué",
 };
 
+/** GET /admin/commerciaux/tableau-de-bord (Admin\CommercialController::tableauDeBord()). */
+export type TableauDeBordCommerciaux = {
+  commerciaux: {
+    total: number;
+    actifs: number;
+    suspendus: number;
+    desactives: number;
+    nouveaux_7j: number;
+    nouveaux_30j: number;
+  };
+  inscriptions_par_semaine: { semaine: string; total: number }[];
+  commandes: { total: number; validees: number; livrees: number; annulees: number };
+  commissions: { total_credite: number; total_repris: number; total_retire: number; solde_total_portefeuilles: number };
+  retraits: { par_statut: Record<StatutRetraitAdmin, { nombre: number; montant: number }> };
+  top_commerciaux: { user_id: number; nom: string; prenom: string | null; commission_totale: number }[];
+};
+
 export function clientDepuisLibelle(dateInscriptionIso: string): string {
   const debut = new Date(dateInscriptionIso).getTime();
   const joursEcoules = Math.floor((Date.now() - debut) / (1000 * 60 * 60 * 24));

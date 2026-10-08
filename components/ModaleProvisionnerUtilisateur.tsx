@@ -19,16 +19,20 @@ const LIBELLE_ROLE: Record<Role, string> = {
   coordinateur: "coordinateur",
   fournisseur: "fournisseur",
   livreur: "livreur",
+  commercial: "commercial",
 };
 
-type Role = "coordinateur" | "fournisseur" | "livreur";
+type Role = "coordinateur" | "fournisseur" | "livreur" | "commercial";
 
 /**
- * Création manuelle d'un Coordinateur/Fournisseur/Livreur par l'Admin — même
- * principe que "Nouveau client" (ModaleNouveauClient dans clients/liste),
- * mais POST /admin/utilisateurs (UtilisateurController::provisionner()) :
- * ces 3 rôles n'ont pas de connexion par téléphone/OTP, un mot de passe est
- * donc exigé ici. CRUD complet côté admin, comme pour un client.
+ * Création manuelle d'un Coordinateur/Fournisseur/Livreur/Commercial par
+ * l'Admin — même principe que "Nouveau client" (ModaleNouveauClient dans
+ * clients/liste), mais POST /admin/utilisateurs
+ * (UtilisateurController::provisionner()). Coordinateur n'a pas de connexion
+ * par téléphone/OTP ; Fournisseur/Livreur/Commercial ont leur propre
+ * auto-inscription mais l'admin peut aussi en créer un directement — un mot
+ * de passe est donc exigé ici dans tous les cas. CRUD complet côté admin,
+ * comme pour un client.
  */
 export function ModaleProvisionnerUtilisateur({
   role,
@@ -49,6 +53,7 @@ export function ModaleProvisionnerUtilisateur({
   const [nomEntreprise, setNomEntreprise] = useState("");
   const [typeVehicule, setTypeVehicule] = useState("");
   const [zoneCouverture, setZoneCouverture] = useState("");
+  const [localisation, setLocalisation] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [apercuPhoto, setApercuPhoto] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
@@ -80,6 +85,7 @@ export function ModaleProvisionnerUtilisateur({
         type_utilisateur: role,
         ...(role === "fournisseur" ? { nom_entreprise: nomEntreprise } : {}),
         ...(role === "livreur" ? { type_vehicule: typeVehicule || null, zone_couverture: zoneCouverture || null } : {}),
+        ...(role === "commercial" ? { nom_entreprise: nomEntreprise || null, localisation: localisation || null } : {}),
       };
 
       let body: unknown = champs;
@@ -166,6 +172,13 @@ export function ModaleProvisionnerUtilisateur({
             <>
               <Listbox value={typeVehicule} onChange={setTypeVehicule} options={OPTIONS_VEHICULE} placeholder="Type de véhicule (optionnel)" />
               <input value={zoneCouverture} onChange={(e) => setZoneCouverture(e.target.value)} placeholder="Zone couverte (optionnel)" className={CHAMP} />
+            </>
+          ) : null}
+
+          {role === "commercial" ? (
+            <>
+              <input value={nomEntreprise} onChange={(e) => setNomEntreprise(e.target.value)} placeholder="Nom de l'entreprise (optionnel)" className={CHAMP} />
+              <input value={localisation} onChange={(e) => setLocalisation(e.target.value)} placeholder="Localisation (optionnel)" className={CHAMP} />
             </>
           ) : null}
         </div>
