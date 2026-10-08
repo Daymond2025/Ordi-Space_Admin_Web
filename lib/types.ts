@@ -161,6 +161,18 @@ export function extraireIdYoutube(url: string): string | null {
   return correspondance?.[1] ?? null;
 }
 
+// --- Réponses rapides (écran "Réponse rapide", app Commercial) -----------
+
+/** `est_favori` : mis en avant par l'Admin (pas un favori personnel par commercial). `nombre_copies` : compteur réel, alimente "Plus utilisés" côté app. */
+export type ReponseRapide = {
+  id: number;
+  titre: string;
+  contenu: string;
+  est_favori: boolean;
+  nombre_copies: number;
+  created_at: string;
+};
+
 // --- Privilèges -----------------------------------------------------------
 
 export type TypePrivilege = "remise_pourcentage" | "remise_montant" | "livraison_gratuite" | "parrainage";
