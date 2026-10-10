@@ -15,6 +15,7 @@ function ConsultationContenu() {
   const [rechercheDebattue, setRechercheDebattue] = useState(searchParams.get("recherche") ?? "");
   const [resultats, setResultats] = useState<ClientAdmin[] | null>(null);
   const [chargement, setChargement] = useState(false);
+  const [erreur, setErreur] = useState(false);
 
   useEffect(() => {
     const id = setTimeout(() => setRechercheDebattue(recherche), 300);
@@ -27,8 +28,10 @@ function ConsultationContenu() {
       return;
     }
     setChargement(true);
+    setErreur(false);
     apiFetch<Pagination<ClientAdmin>>(`/admin/clients?recherche=${encodeURIComponent(rechercheDebattue)}&per_page=8`, { token })
       .then((p) => setResultats(p.data))
+      .catch(() => setErreur(true))
       .finally(() => setChargement(false));
   }, [token, rechercheDebattue]);
 
@@ -56,6 +59,8 @@ function ConsultationContenu() {
         <div className="rounded-3xl border border-brand-line bg-white p-6 shadow-none">
           {chargement ? (
             <p className="py-10 text-center text-sm text-brand-muted">Recherche…</p>
+          ) : erreur ? (
+            <p className="py-10 text-center text-sm text-rose-600">Impossible d&apos;effectuer cette recherche.</p>
           ) : !resultats || resultats.length === 0 ? (
             <p className="py-10 text-center text-sm text-brand-muted">Aucun client ne correspond à « {rechercheDebattue} ».</p>
           ) : (

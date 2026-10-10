@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { LIBELLE_FAMILLE_CATEGORIE, type Categorie, type FamilleCategorie } from "@/lib/types";
@@ -142,11 +142,19 @@ export default function CategoriesPage() {
   // `undefined` = fermé ; `null` = nouvelle catégorie ; sinon la catégorie à modifier.
   const [edition, setEdition] = useState<Categorie | null | undefined>(undefined);
   const [page, setPage] = useState(1);
+  const [erreurListe, setErreurListe] = useState(false);
 
-  useEffect(() => {
+  const charger = useCallback(() => {
     if (!token) return;
-    apiFetch<Categorie[]>("/categories", { token }).then(setCategories);
+    apiFetch<Categorie[]>("/categories", { token })
+      .then((data) => {
+        setCategories(data);
+        setErreurListe(false);
+      })
+      .catch(() => setErreurListe(true));
   }, [token]);
+
+  useEffect(charger, [charger]);
 
   function apresEnregistrement(enregistree: Categorie) {
     setCategories((liste) => {
@@ -188,7 +196,14 @@ export default function CategoriesPage() {
         }
       />
 
-      {categories === null ? (
+      {erreurListe ? (
+        <div className="flex flex-col items-center gap-3 py-10 text-center">
+          <p className="text-sm text-rose-600">Impossible de charger les catégories.</p>
+          <button type="button" onClick={charger} className="rounded-full border border-brand-line px-4 py-2 text-xs font-semibold text-brand-ink">
+            Réessayer
+          </button>
+        </div>
+      ) : categories === null ? (
         <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
       ) : categories.length === 0 ? (
         <p className="py-10 text-center text-sm text-brand-muted">Aucune catégorie pour l&apos;instant.</p>

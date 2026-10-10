@@ -64,12 +64,18 @@ export default function OperationsPage() {
   const [produits, setProduits] = useState<Produit[] | null>(null);
   const [categories, setCategories] = useState<Categorie[] | null>(null);
   const [activite, setActivite] = useState<ProduitActifCoordinateur[] | null>(null);
+  const [erreurProduits, setErreurProduits] = useState(false);
+  const [erreurActivite, setErreurActivite] = useState(false);
 
   useEffect(() => {
     if (!token) return;
-    apiFetch<Pagination<Produit>>("/produits?statut=tous&per_page=100", { token }).then((page) => setProduits(page.data));
-    apiFetch<Categorie[]>("/categories", { token }).then(setCategories);
-    apiFetch<ProduitActifCoordinateur[]>("/produits/activite-recente", { token }).then(setActivite);
+    apiFetch<Pagination<Produit>>("/produits?statut=tous&per_page=100", { token })
+      .then((page) => setProduits(page.data))
+      .catch(() => setErreurProduits(true));
+    apiFetch<Categorie[]>("/categories", { token }).then(setCategories).catch(() => setCategories([]));
+    apiFetch<ProduitActifCoordinateur[]>("/produits/activite-recente", { token })
+      .then(setActivite)
+      .catch(() => setErreurActivite(true));
   }, [token]);
 
   const parStatut = useMemo(() => {
@@ -133,7 +139,9 @@ export default function OperationsPage() {
         <div className="rounded-2xl border border-brand-line bg-white p-5">
           <p className="text-sm font-bold text-brand-ink">Répartition des produits par statut</p>
           <div className="mt-4">
-            {parStatut ? (
+            {erreurProduits ? (
+              <p className="py-4 text-center text-sm text-rose-600">Impossible de charger les produits.</p>
+            ) : parStatut ? (
               <RepartitionBarre
                 items={[
                   { label: LIBELLE_STATUT_PRODUIT.valide, valeur: parStatut.valide, couleur: COULEUR_STATUT.valide },
@@ -177,7 +185,9 @@ export default function OperationsPage() {
           <h2 className="text-sm font-bold text-brand-ink">Conversations récentes sur les commandes</h2>
         </div>
 
-        {activite === null ? (
+        {erreurActivite ? (
+          <p className="py-10 text-center text-sm text-rose-600">Impossible de charger l&apos;activité récente.</p>
+        ) : activite === null ? (
           <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
         ) : activite.length === 0 ? (
           <p className="py-10 text-center text-sm text-brand-muted">Aucune activité récente pour l&apos;instant.</p>

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
 import {
@@ -28,11 +28,19 @@ export default function DeclarationsPannePage() {
   const { token } = useAuth();
   const [demandes, setDemandes] = useState<DemandeSav[] | null>(null);
   const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]["id"]>("tous");
+  const [erreur, setErreur] = useState(false);
 
-  useEffect(() => {
+  const charger = useCallback(() => {
     if (!token) return;
-    apiFetch<Pagination<DemandeSav>>("/sav/demandes?per_page=100", { token }).then((page) => setDemandes(page.data));
+    apiFetch<Pagination<DemandeSav>>("/sav/demandes?per_page=100", { token })
+      .then((page) => {
+        setDemandes(page.data);
+        setErreur(false);
+      })
+      .catch(() => setErreur(true));
   }, [token]);
+
+  useEffect(charger, [charger]);
 
   const listeFiltree = useMemo(
     () => (onglet === "tous" ? demandes : (demandes?.filter((d) => d.statut_demande === onglet) ?? null)),
@@ -67,7 +75,14 @@ export default function DeclarationsPannePage() {
         ))}
       </div>
 
-      {listeFiltree === null ? (
+      {erreur ? (
+        <div className="flex flex-col items-center gap-3 py-10 text-center">
+          <p className="text-sm text-rose-600">Impossible de charger les déclarations de panne.</p>
+          <button type="button" onClick={charger} className="rounded-full border border-brand-line px-4 py-2 text-xs font-semibold text-brand-ink">
+            Réessayer
+          </button>
+        </div>
+      ) : listeFiltree === null ? (
         <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
       ) : listeFiltree.length === 0 ? (
         <p className="py-10 text-center text-sm text-brand-muted">Aucune déclaration dans cette catégorie.</p>

@@ -130,6 +130,7 @@ export default function ReclamationsPage() {
   const [pagination, setPagination] = useState<Pick<Pagination<ReclamationAdmin>, "current_page" | "last_page" | "total"> | null>(null);
   const [statutFiltre, setStatutFiltre] = useState("");
   const [page, setPage] = useState(1);
+  const [erreur, setErreur] = useState(false);
 
   function recharger() {
     if (!token) return;
@@ -141,10 +142,13 @@ export default function ReclamationsPage() {
     const params = new URLSearchParams({ per_page: "10", page: String(page), type_auteur: "client" });
     if (statutFiltre) params.set("statut", statutFiltre);
 
-    apiFetch<Pagination<ReclamationAdmin>>(`/reclamations?${params}`, { token }).then((p) => {
-      setReclamations(p.data);
-      setPagination({ current_page: p.current_page, last_page: p.last_page, total: p.total });
-    });
+    apiFetch<Pagination<ReclamationAdmin>>(`/reclamations?${params}`, { token })
+      .then((p) => {
+        setReclamations(p.data);
+        setPagination({ current_page: p.current_page, last_page: p.last_page, total: p.total });
+        setErreur(false);
+      })
+      .catch(() => setErreur(true));
   }
 
   useEffect(recharger, [token, statutFiltre, page]);
@@ -168,7 +172,14 @@ export default function ReclamationsPage() {
       </div>
 
       <div className="mt-5 flex flex-col gap-3">
-        {reclamations === null ? (
+        {erreur ? (
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <p className="text-sm text-rose-600">Impossible de charger les réclamations.</p>
+            <button type="button" onClick={recharger} className="rounded-full border border-brand-line px-4 py-2 text-xs font-semibold text-brand-ink">
+              Réessayer
+            </button>
+          </div>
+        ) : reclamations === null ? (
           <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
         ) : reclamations.length === 0 ? (
           <p className="py-10 text-center text-sm text-brand-muted">Aucune réclamation pour l&apos;instant.</p>

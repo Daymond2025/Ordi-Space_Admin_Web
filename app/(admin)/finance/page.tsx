@@ -33,6 +33,7 @@ export default function FinancePage() {
   const [statut, setStatut] = useState<(typeof ONGLETS_STATUT)[number]["id"]>("tous");
   const [periode, setPeriode] = useState<(typeof ONGLETS_PERIODE)[number]["id"]>("tout");
   const [portefeuille, setPortefeuille] = useState<PortefeuilleGlobalAdmin | null>(null);
+  const [erreur, setErreur] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -40,9 +41,16 @@ export default function FinancePage() {
     const params = new URLSearchParams({ per_page: "50", periode });
     if (statut !== "tous") params.set("statut", statut);
 
-    apiFetch<PortefeuilleGlobalAdmin>(`/coordinateur/portefeuille?${params}`, { token }).then((data) => {
-      if (!annule) setPortefeuille(data);
-    });
+    apiFetch<PortefeuilleGlobalAdmin>(`/coordinateur/portefeuille?${params}`, { token })
+      .then((data) => {
+        if (!annule) {
+          setPortefeuille(data);
+          setErreur(false);
+        }
+      })
+      .catch(() => {
+        if (!annule) setErreur(true);
+      });
 
     return () => {
       annule = true;
@@ -92,7 +100,9 @@ export default function FinancePage() {
       </div>
 
       <div className="flex flex-col gap-2">
-        {portefeuille === null ? (
+        {erreur ? (
+          <p className="py-10 text-center text-sm text-rose-600">Impossible de charger le portefeuille.</p>
+        ) : portefeuille === null ? (
           <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
         ) : portefeuille.transactions.data.length === 0 ? (
           <p className="py-10 text-center text-sm text-brand-muted">Aucune transaction dans cette catégorie.</p>

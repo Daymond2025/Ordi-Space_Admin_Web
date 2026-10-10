@@ -229,11 +229,14 @@ export default function ListeClientsPage() {
     if (recherche) params.set("recherche", recherche);
     if (statut) params.set("statut_compte", statut);
 
-    apiFetchAvecMeta<Pagination<ClientAdmin>, { stats: StatsClients }>(`/admin/clients?${params}`, { token }).then(({ data, meta }) => {
-      setClients(data.data);
-      setPagination({ current_page: data.current_page, last_page: data.last_page, total: data.total });
-      setStats(meta.stats);
-    });
+    apiFetchAvecMeta<Pagination<ClientAdmin>, { stats: StatsClients }>(`/admin/clients?${params}`, { token })
+      .then(({ data, meta }) => {
+        setClients(data.data);
+        setPagination({ current_page: data.current_page, last_page: data.last_page, total: data.total });
+        setStats(meta.stats);
+        setErreur(null);
+      })
+      .catch(() => setErreur("Impossible de charger la liste des clients."));
   }
 
   useEffect(rechargerClients, [token, recherche, statut, tri, page]);

@@ -53,6 +53,10 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
   const [paiements, setPaiements] = useState<PaiementsGlobalFournisseurAdmin | null>(null);
   const [referencePaiement, setReferencePaiement] = useState("");
   const [enCours, setEnCours] = useState(false);
+  const [erreurChargement, setErreurChargement] = useState<string | null>(null);
+  const [erreurCommandes, setErreurCommandes] = useState(false);
+  const [erreurPortefeuille, setErreurPortefeuille] = useState(false);
+  const [erreurPaiements, setErreurPaiements] = useState(false);
 
   const [utilisateur, setUtilisateur] = useState<UtilisateurAdmin | null>(null);
   const [edition, setEdition] = useState(false);
@@ -68,18 +72,21 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
       apiFetch<FournisseurDetailAdmin>(`/fournisseurs/${fournisseurId}`, { token }),
       apiFetch<StatistiquesFournisseurAdmin>(`/fournisseurs/${fournisseurId}/statistiques?periode=tout`, { token }),
       apiFetch<UtilisateurAdmin>(`/admin/utilisateurs/${fournisseurId}`, { token }),
-    ]).then(([d, s, u]) => {
-      setDetail(d);
-      setVentes(s);
-      setUtilisateur(u);
-      setBrouillon({
-        nom: u.nom, prenom: u.prenom ?? "", email: u.email ?? "", telephone: u.telephone ?? "",
-        nomEntreprise: d.fournisseur.nom_entreprise, adresseEntreprise: d.fournisseur.adresse_entreprise ?? "",
-        contactPro: d.fournisseur.contact_pro ?? "", nomGerant: d.fournisseur.nom_gerant ?? "",
-        telephoneGerant: d.fournisseur.telephone_gerant ?? "", horairesOuverture: d.fournisseur.horaires_ouverture ?? "",
-        zoneCouverte: d.fournisseur.zone_couverte ?? "",
-      });
-    });
+    ])
+      .then(([d, s, u]) => {
+        setDetail(d);
+        setVentes(s);
+        setUtilisateur(u);
+        setBrouillon({
+          nom: u.nom, prenom: u.prenom ?? "", email: u.email ?? "", telephone: u.telephone ?? "",
+          nomEntreprise: d.fournisseur.nom_entreprise, adresseEntreprise: d.fournisseur.adresse_entreprise ?? "",
+          contactPro: d.fournisseur.contact_pro ?? "", nomGerant: d.fournisseur.nom_gerant ?? "",
+          telephoneGerant: d.fournisseur.telephone_gerant ?? "", horairesOuverture: d.fournisseur.horaires_ouverture ?? "",
+          zoneCouverte: d.fournisseur.zone_couverte ?? "",
+        });
+        setErreurChargement(null);
+      })
+      .catch(() => setErreurChargement("Impossible de charger ce fournisseur."));
   }
 
   useEffect(charger, [token, fournisseurId]);
@@ -131,21 +138,25 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
   }
 
   useEffect(() => {
-    if (!token || onglet !== "commandes" || commandes !== null) return;
-    apiFetch<{ commandes: Pagination<CommandeFournisseur> }>(`/fournisseurs/${fournisseurId}/commandes?per_page=50`, { token }).then(
-      (r) => setCommandes(r.commandes.data)
-    );
-  }, [token, onglet, commandes, fournisseurId]);
+    if (!token || onglet !== "commandes" || commandes !== null || erreurCommandes) return;
+    apiFetch<{ commandes: Pagination<CommandeFournisseur> }>(`/fournisseurs/${fournisseurId}/commandes?per_page=50`, { token })
+      .then((r) => setCommandes(r.commandes.data))
+      .catch(() => setErreurCommandes(true));
+  }, [token, onglet, commandes, erreurCommandes, fournisseurId]);
 
   useEffect(() => {
-    if (!token || onglet !== "portefeuille" || portefeuille !== null) return;
-    apiFetch<PortefeuilleFournisseurAdmin>(`/fournisseurs/${fournisseurId}/portefeuille?periode=tout`, { token }).then(setPortefeuille);
-  }, [token, onglet, portefeuille, fournisseurId]);
+    if (!token || onglet !== "portefeuille" || portefeuille !== null || erreurPortefeuille) return;
+    apiFetch<PortefeuilleFournisseurAdmin>(`/fournisseurs/${fournisseurId}/portefeuille?periode=tout`, { token })
+      .then(setPortefeuille)
+      .catch(() => setErreurPortefeuille(true));
+  }, [token, onglet, portefeuille, erreurPortefeuille, fournisseurId]);
 
   useEffect(() => {
-    if (!token || onglet !== "paiements" || paiements !== null) return;
-    apiFetch<PaiementsGlobalFournisseurAdmin>(`/fournisseurs/${fournisseurId}/paiements?periode=tout`, { token }).then(setPaiements);
-  }, [token, onglet, paiements, fournisseurId]);
+    if (!token || onglet !== "paiements" || paiements !== null || erreurPaiements) return;
+    apiFetch<PaiementsGlobalFournisseurAdmin>(`/fournisseurs/${fournisseurId}/paiements?periode=tout`, { token })
+      .then(setPaiements)
+      .catch(() => setErreurPaiements(true));
+  }, [token, onglet, paiements, erreurPaiements, fournisseurId]);
 
   async function payerTout() {
     if (!token || !referencePaiement.trim() || enCours) return;
@@ -189,6 +200,14 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
       />
 
       {erreurEdition ? <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{erreurEdition}</p> : null}
+      {erreurChargement ? (
+        <div className="flex items-center justify-between rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">
+          <span>{erreurChargement}</span>
+          <button type="button" onClick={charger} className="font-semibold underline">
+            Réessayer
+          </button>
+        </div>
+      ) : null}
 
       {fournisseur && utilisateur ? (
         <div className="rounded-2xl border border-brand-line bg-white p-4">
@@ -393,7 +412,9 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
 
       {onglet === "commandes" ? (
         <div className="flex flex-col gap-2">
-          {commandes === null ? (
+          {erreurCommandes ? (
+            <p className="py-10 text-center text-sm text-rose-600">Impossible de charger les commandes.</p>
+          ) : commandes === null ? (
             <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
           ) : commandes.length === 0 ? (
             <p className="py-10 text-center text-sm text-brand-muted">Aucune commande.</p>
@@ -450,7 +471,9 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
           ) : null}
 
           <div className="flex flex-col gap-2">
-            {portefeuille === null ? (
+            {erreurPortefeuille ? (
+              <p className="py-10 text-center text-sm text-rose-600">Impossible de charger le portefeuille.</p>
+            ) : portefeuille === null ? (
               <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
             ) : portefeuille.transactions.data.length === 0 ? (
               <p className="py-10 text-center text-sm text-brand-muted">Aucune transaction.</p>
@@ -498,7 +521,9 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
           </div>
 
           <div className="flex flex-col gap-2">
-            {paiements === null ? (
+            {erreurPaiements ? (
+              <p className="py-10 text-center text-sm text-rose-600">Impossible de charger les paiements.</p>
+            ) : paiements === null ? (
               <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
             ) : paiements.items.length === 0 ? (
               <p className="py-10 text-center text-sm text-brand-muted">Aucun paiement.</p>

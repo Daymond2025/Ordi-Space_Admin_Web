@@ -42,8 +42,18 @@ export default function GarantixPage() {
 
   function recharger() {
     if (!token) return;
-    apiFetch<FormuleGarantix[]>("/garantix/formules", { token }).then(setFormules);
-    apiFetch<ExclusionGarantix[]>("/garantix/exclusions", { token }).then(setExclusions);
+    apiFetch<FormuleGarantix[]>("/garantix/formules", { token })
+      .then((data) => {
+        setFormules(data);
+        setErreur(null);
+      })
+      .catch(() => setErreur("Impossible de charger les formules Garantix."));
+    apiFetch<ExclusionGarantix[]>("/garantix/exclusions", { token })
+      .then((data) => {
+        setExclusions(data);
+        setErreur(null);
+      })
+      .catch(() => setErreur((e) => e ?? "Impossible de charger les exclusions."));
   }
 
   useEffect(recharger, [token]);

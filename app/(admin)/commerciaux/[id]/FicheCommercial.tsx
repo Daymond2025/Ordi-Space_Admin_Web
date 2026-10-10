@@ -35,6 +35,7 @@ export function FicheCommercial({ commercialId }: { commercialId: number }) {
   const { token } = useAuth();
   const [detail, setDetail] = useState<CommercialDetailAdmin | null>(null);
   const [commandes, setCommandes] = useState<CommandeCommercialAdmin[] | null>(null);
+  const [erreurCommandes, setErreurCommandes] = useState(false);
 
   const [utilisateur, setUtilisateur] = useState<UtilisateurAdmin | null>(null);
   const [edition, setEdition] = useState(false);
@@ -47,23 +48,29 @@ export function FicheCommercial({ commercialId }: { commercialId: number }) {
     Promise.all([
       apiFetch<CommercialDetailAdmin>(`/coordinateur/commerciaux/${commercialId}`, { token }),
       apiFetch<UtilisateurAdmin>(`/admin/utilisateurs/${commercialId}`, { token }),
-    ]).then(([d, u]) => {
-      setDetail(d);
-      setUtilisateur(u);
-      setBrouillon({
-        nom: u.nom, prenom: u.prenom ?? "", email: u.email ?? "", telephone: u.telephone ?? "",
-        nomEntreprise: d.nom_entreprise ?? "", localisation: d.localisation ?? "",
-      });
-    });
+    ])
+      .then(([d, u]) => {
+        setDetail(d);
+        setUtilisateur(u);
+        setBrouillon({
+          nom: u.nom, prenom: u.prenom ?? "", email: u.email ?? "", telephone: u.telephone ?? "",
+          nomEntreprise: d.nom_entreprise ?? "", localisation: d.localisation ?? "",
+        });
+        setErreur(null);
+      })
+      .catch(() => setErreur("Impossible de charger ce commercial."));
   }
 
   useEffect(charger, [token, commercialId]);
 
   useEffect(() => {
     if (!token) return;
-    apiFetch<Pagination<CommandeCommercialAdmin>>(`/coordinateur/commerciaux/${commercialId}/commandes?per_page=50`, { token }).then((page) =>
-      setCommandes(page.data)
-    );
+    apiFetch<Pagination<CommandeCommercialAdmin>>(`/coordinateur/commerciaux/${commercialId}/commandes?per_page=50`, { token })
+      .then((page) => {
+        setCommandes(page.data);
+        setErreurCommandes(false);
+      })
+      .catch(() => setErreurCommandes(true));
   }, [token, commercialId]);
 
   async function enregistrerIdentite() {
@@ -245,7 +252,9 @@ export function FicheCommercial({ commercialId }: { commercialId: number }) {
 
       <div className="flex flex-col gap-2">
         <p className="text-sm font-bold text-brand-ink">Commandes saisies</p>
-        {commandes === null ? (
+        {erreurCommandes ? (
+          <p className="py-10 text-center text-sm text-rose-600">Impossible de charger les commandes.</p>
+        ) : commandes === null ? (
           <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
         ) : commandes.length === 0 ? (
           <p className="py-10 text-center text-sm text-brand-muted">Aucune commande.</p>

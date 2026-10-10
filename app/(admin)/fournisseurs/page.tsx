@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { formaterDate, formaterPrix, type FournisseurAdmin, type Pagination } from "@/lib/types";
@@ -21,11 +21,19 @@ export default function FournisseursPage() {
   const [fournisseurs, setFournisseurs] = useState<FournisseurAdmin[] | null>(null);
   const [recherche, setRecherche] = useState("");
   const [modaleOuverte, setModaleOuverte] = useState(false);
+  const [erreur, setErreur] = useState(false);
 
-  useEffect(() => {
+  const charger = useCallback(() => {
     if (!token) return;
-    apiFetch<Pagination<FournisseurAdmin>>("/fournisseurs?per_page=100", { token }).then((page) => setFournisseurs(page.data));
+    apiFetch<Pagination<FournisseurAdmin>>("/fournisseurs?per_page=100", { token })
+      .then((page) => {
+        setFournisseurs(page.data);
+        setErreur(false);
+      })
+      .catch(() => setErreur(true));
   }, [token]);
+
+  useEffect(charger, [charger]);
 
   const listeFiltree = useMemo(() => {
     if (!fournisseurs) return null;
@@ -77,7 +85,14 @@ export default function FournisseursPage() {
         />
       </div>
 
-      {listeFiltree === null ? (
+      {erreur ? (
+        <div className="flex flex-col items-center gap-3 py-10 text-center">
+          <p className="text-sm text-rose-600">Impossible de charger les fournisseurs.</p>
+          <button type="button" onClick={charger} className="rounded-full border border-brand-line px-4 py-2 text-xs font-semibold text-brand-ink">
+            Réessayer
+          </button>
+        </div>
+      ) : listeFiltree === null ? (
         <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
       ) : listeFiltree.length === 0 ? (
         <p className="py-10 text-center text-sm text-brand-muted">Aucun fournisseur.</p>

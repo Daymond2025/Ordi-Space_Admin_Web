@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
 import {
@@ -14,14 +14,17 @@ import { ChatIcon, ChevronDownIcon } from "@/components/icons";
 function LigneConversation({ conversation, token }: { conversation: ClientConversationIa; token: string }) {
   const [ouvert, setOuvert] = useState(false);
   const [messages, setMessages] = useState<MessageAssistantIaAdmin[] | null>(null);
+  const [erreurMessages, setErreurMessages] = useState(false);
 
   function basculer() {
     setOuvert((v) => !v);
-    if (!messages) {
+    if (!messages && !erreurMessages) {
       apiFetch<{ client: unknown; messages: MessageAssistantIaAdmin[] }>(
         `/admin/assistant-ia/clients/${conversation.id}/messages`,
         { token }
-      ).then((reponse) => setMessages(reponse.messages));
+      )
+        .then((reponse) => setMessages(reponse.messages))
+        .catch(() => setErreurMessages(true));
     }
   }
 
@@ -48,7 +51,9 @@ function LigneConversation({ conversation, token }: { conversation: ClientConver
 
       {ouvert ? (
         <div className="ml-14 mt-3 flex flex-col gap-2 border-t border-brand-line pt-3">
-          {messages === null ? (
+          {erreurMessages ? (
+            <p className="text-xs text-rose-600">Impossible de charger ces messages.</p>
+          ) : messages === null ? (
             <p className="text-xs text-brand-muted">Chargement…</p>
           ) : (
             messages.map((message) => (
@@ -77,16 +82,22 @@ export default function AideRapideAdminPage() {
   const { token } = useAuth();
   const [conversations, setConversations] = useState<ClientConversationIa[] | null>(null);
   const [recherche, setRecherche] = useState("");
+  const [erreur, setErreur] = useState(false);
 
-  useEffect(() => {
+  const charger = useCallback(() => {
     if (!token) return;
     const params = new URLSearchParams({ per_page: "20" });
     if (recherche) params.set("recherche", recherche);
 
-    apiFetch<Pagination<ClientConversationIa>>(`/admin/assistant-ia/clients?${params}`, { token }).then((page) =>
-      setConversations(page.data)
-    );
+    apiFetch<Pagination<ClientConversationIa>>(`/admin/assistant-ia/clients?${params}`, { token })
+      .then((page) => {
+        setConversations(page.data);
+        setErreur(false);
+      })
+      .catch(() => setErreur(true));
   }, [token, recherche]);
+
+  useEffect(charger, [charger]);
 
   return (
     <div className="rounded-3xl border border-brand-line bg-white p-6 shadow-none">
@@ -106,7 +117,14 @@ export default function AideRapideAdminPage() {
       </div>
 
       <div className="mt-5 flex flex-col gap-3">
-        {conversations === null ? (
+        {erreur ? (
+          <div className="flex flex-col items-center gap-3 py-10 text-center">
+            <p className="text-sm text-rose-600">Impossible de charger les conversations.</p>
+            <button type="button" onClick={charger} className="rounded-full border border-brand-line px-4 py-2 text-xs font-semibold text-brand-ink">
+              Réessayer
+            </button>
+          </div>
+        ) : conversations === null ? (
           <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
         ) : conversations.length === 0 ? (
           <p className="py-10 text-center text-sm text-brand-muted">Aucune conversation pour l&apos;instant.</p>

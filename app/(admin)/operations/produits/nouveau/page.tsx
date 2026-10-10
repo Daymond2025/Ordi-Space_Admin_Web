@@ -116,7 +116,7 @@ export default function NouveauProduitPage() {
 
   useEffect(() => {
     if (!token) return;
-    apiFetch<Categorie[]>("/categories", { token }).then(setCategories);
+    apiFetch<Categorie[]>("/categories", { token }).then(setCategories).catch(() => setCategories([]));
   }, [token]);
 
   const etapes = useMemo(

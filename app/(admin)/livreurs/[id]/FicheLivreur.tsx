@@ -50,6 +50,7 @@ export function FicheLivreur({ livreurId }: { livreurId: number }) {
   const [detail, setDetail] = useState<LivreurDetailAdmin | null>(null);
   const [missions, setMissions] = useState<MissionLivreurAdmin[] | null>(null);
   const [ventesBoutique, setVentesBoutique] = useState<ReponseCommandesBoutiqueAdmin | null>(null);
+  const [erreurVentesBoutique, setErreurVentesBoutique] = useState(false);
 
   const [utilisateur, setUtilisateur] = useState<UtilisateurAdmin | null>(null);
   const [edition, setEdition] = useState(false);
@@ -63,15 +64,18 @@ export function FicheLivreur({ livreurId }: { livreurId: number }) {
       apiFetch<LivreurDetailAdmin>(`/coordinateur/livreurs/${livreurId}`, { token }),
       apiFetch<MissionLivreurAdmin[]>(`/coordinateur/livreurs/${livreurId}/missions`, { token }),
       apiFetch<UtilisateurAdmin>(`/admin/utilisateurs/${livreurId}`, { token }),
-    ]).then(([d, m, u]) => {
-      setDetail(d);
-      setMissions(m);
-      setUtilisateur(u);
-      setBrouillon({
-        nom: u.nom, prenom: u.prenom ?? "", email: u.email ?? "", telephone: u.telephone ?? "",
-        typeVehicule: d.type_vehicule ?? "", zoneCouverture: d.zone_couverture ?? "",
-      });
-    });
+    ])
+      .then(([d, m, u]) => {
+        setDetail(d);
+        setMissions(m);
+        setUtilisateur(u);
+        setBrouillon({
+          nom: u.nom, prenom: u.prenom ?? "", email: u.email ?? "", telephone: u.telephone ?? "",
+          typeVehicule: d.type_vehicule ?? "", zoneCouverture: d.zone_couverture ?? "",
+        });
+        setErreur(null);
+      })
+      .catch(() => setErreur("Impossible de charger ce livreur."));
   }
 
   useEffect(charger, [token, livreurId]);
@@ -116,9 +120,12 @@ export function FicheLivreur({ livreurId }: { livreurId: number }) {
 
   useEffect(() => {
     if (!token) return;
-    apiFetch<ReponseCommandesBoutiqueAdmin>(`/admin/boutique/commandes?livreur_id=${livreurId}&per_page=50`, { token }).then(
-      setVentesBoutique
-    );
+    apiFetch<ReponseCommandesBoutiqueAdmin>(`/admin/boutique/commandes?livreur_id=${livreurId}&per_page=50`, { token })
+      .then((data) => {
+        setVentesBoutique(data);
+        setErreurVentesBoutique(false);
+      })
+      .catch(() => setErreurVentesBoutique(true));
   }, [token, livreurId]);
 
   return (
@@ -297,7 +304,9 @@ export function FicheLivreur({ livreurId }: { livreurId: number }) {
         <p className="text-xs text-brand-muted">
           Commandes apportées par ce livreur via son lien/QR affilié — distinctes des missions de livraison ci-dessus.
         </p>
-        {ventesBoutique === null ? (
+        {erreurVentesBoutique ? (
+          <p className="py-10 text-center text-sm text-rose-600">Impossible de charger les ventes boutique.</p>
+        ) : ventesBoutique === null ? (
           <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
         ) : ventesBoutique.commandes.data.length === 0 ? (
           <p className="py-10 text-center text-sm text-brand-muted">Aucune vente boutique apportée par ce livreur.</p>

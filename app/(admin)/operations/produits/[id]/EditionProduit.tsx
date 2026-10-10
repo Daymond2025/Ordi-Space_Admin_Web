@@ -3,7 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import {
@@ -46,22 +46,28 @@ export function EditionProduit({ id }: { id: string }) {
   const [erreur, setErreur] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
   const [chargement, setChargement] = useState(false);
+  const [erreurChargement, setErreurChargement] = useState(false);
 
-  useEffect(() => {
+  const charger = useCallback(() => {
     if (!token) return;
-    apiFetch<Categorie[]>("/categories", { token }).then(setCategories);
-    apiFetch<Produit>(`/produits/${id}`, { token }).then((p) => {
-      setProduit(p);
-      setCategorieId(String(p.categorie.id));
-      setNom(p.nom_produit);
-      setDescription(p.description ?? "");
-      setPrix(p.prix);
-      setStock(String(p.quantite_stock));
-      setTypeLivraison(p.type_livraison);
-      setDureeGarantie(p.duree_garantie_mois ? String(p.duree_garantie_mois) : "");
-      setBoutique(champsDepuisProduit(p));
-    });
+    apiFetch<Categorie[]>("/categories", { token }).then(setCategories).catch(() => setCategories([]));
+    apiFetch<Produit>(`/produits/${id}`, { token })
+      .then((p) => {
+        setProduit(p);
+        setCategorieId(String(p.categorie.id));
+        setNom(p.nom_produit);
+        setDescription(p.description ?? "");
+        setPrix(p.prix);
+        setStock(String(p.quantite_stock));
+        setTypeLivraison(p.type_livraison);
+        setDureeGarantie(p.duree_garantie_mois ? String(p.duree_garantie_mois) : "");
+        setBoutique(champsDepuisProduit(p));
+        setErreurChargement(false);
+      })
+      .catch(() => setErreurChargement(true));
   }, [token, id]);
+
+  useEffect(charger, [charger]);
 
   async function enregistrer(e: FormEvent) {
     e.preventDefault();
@@ -154,6 +160,17 @@ export function EditionProduit({ id }: { id: string }) {
     } catch (e) {
       setErreur(e instanceof ApiRequestError ? e.message : "Suppression impossible.");
     }
+  }
+
+  if (erreurChargement) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-10 text-center">
+        <p className="text-sm text-rose-600">Impossible de charger ce produit.</p>
+        <button type="button" onClick={charger} className="rounded-full border border-brand-line px-4 py-2 text-xs font-semibold text-brand-ink">
+          Réessayer
+        </button>
+      </div>
+    );
   }
 
   if (!produit) {

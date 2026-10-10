@@ -37,6 +37,7 @@ export default function ReclamationsCoordinateurPage() {
   const [statut, setStatut] = useState<(typeof ONGLETS_STATUT)[number]["id"]>("tous");
   const [entite, setEntite] = useState<(typeof ENTITES)[number]["id"]>("toutes");
   const [reclamations, setReclamations] = useState<ReclamationCoordinateurAdmin[] | null>(null);
+  const [erreur, setErreur] = useState(false);
 
   useEffect(() => {
     if (!token) return;
@@ -45,9 +46,16 @@ export default function ReclamationsCoordinateurPage() {
     if (statut !== "tous") params.set("statut", statut);
     if (entite !== "toutes") params.set("type_auteur", entite);
 
-    apiFetch<Pagination<ReclamationCoordinateurAdmin>>(`/reclamations?${params}`, { token }).then((page) => {
-      if (!annule) setReclamations(page.data);
-    });
+    apiFetch<Pagination<ReclamationCoordinateurAdmin>>(`/reclamations?${params}`, { token })
+      .then((page) => {
+        if (!annule) {
+          setReclamations(page.data);
+          setErreur(false);
+        }
+      })
+      .catch(() => {
+        if (!annule) setErreur(true);
+      });
 
     return () => {
       annule = true;
@@ -105,7 +113,9 @@ export default function ReclamationsCoordinateurPage() {
         </select>
       </div>
 
-      {reclamations === null ? (
+      {erreur ? (
+        <p className="py-10 text-center text-sm text-rose-600">Impossible de charger les réclamations.</p>
+      ) : reclamations === null ? (
         <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
       ) : reclamations.length === 0 ? (
         <p className="py-10 text-center text-sm text-brand-muted">Aucune réclamation dans cette catégorie.</p>

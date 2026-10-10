@@ -257,6 +257,10 @@ export function DashboardGeneral() {
   // manuels (bouton "Actualiser") ont besoin de le déclencher eux-mêmes.
   const [enChargement, setEnChargement] = useState(true);
   const [derniereMaj, setDerniereMaj] = useState<Date | null>(null);
+  // Sans ça, un échec (serveur lent, erreur réseau) laissait l'écran sur des
+  // "0" silencieux partout, impossible à distinguer d'un vrai zéro — voir
+  // audit du 2026-10-10.
+  const [erreur, setErreur] = useState(false);
 
   const recharger = useCallback(() => {
     if (!token) return;
@@ -264,7 +268,9 @@ export function DashboardGeneral() {
       .then((data) => {
         setDonnees(data);
         setDerniereMaj(new Date());
+        setErreur(false);
       })
+      .catch(() => setErreur(true))
       .finally(() => setEnChargement(false));
   }, [token]);
 
@@ -302,6 +308,12 @@ export function DashboardGeneral() {
           </button>
         </div>
       </div>
+
+      {erreur ? (
+        <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">
+          Impossible de charger le tableau de bord — réessaie avec le bouton &quot;Actualiser&quot;.
+        </p>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
         <CarteKpi

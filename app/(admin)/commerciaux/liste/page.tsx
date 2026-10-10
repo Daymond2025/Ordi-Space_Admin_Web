@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { formaterPrix, type CommercialAdmin } from "@/lib/types";
@@ -29,11 +29,19 @@ export default function CommerciauxListePage() {
   const [onglet, setOnglet] = useState<(typeof ONGLETS)[number]["id"]>("tous");
   const [recherche, setRecherche] = useState("");
   const [modaleOuverte, setModaleOuverte] = useState(false);
+  const [erreur, setErreur] = useState(false);
 
-  useEffect(() => {
+  const charger = useCallback(() => {
     if (!token) return;
-    apiFetch<CommercialAdmin[]>("/coordinateur/commerciaux", { token }).then(setCommerciaux);
+    apiFetch<CommercialAdmin[]>("/coordinateur/commerciaux", { token })
+      .then((data) => {
+        setCommerciaux(data);
+        setErreur(false);
+      })
+      .catch(() => setErreur(true));
   }, [token]);
+
+  useEffect(charger, [charger]);
 
   const listeFiltree = useMemo(() => {
     if (!commerciaux) return null;
@@ -106,7 +114,14 @@ export default function CommerciauxListePage() {
         </div>
       </div>
 
-      {listeFiltree === null ? (
+      {erreur ? (
+        <div className="flex flex-col items-center gap-3 py-10 text-center">
+          <p className="text-sm text-rose-600">Impossible de charger les commerciaux.</p>
+          <button type="button" onClick={charger} className="rounded-full border border-brand-line px-4 py-2 text-xs font-semibold text-brand-ink">
+            Réessayer
+          </button>
+        </div>
+      ) : listeFiltree === null ? (
         <p className="py-10 text-center text-sm text-brand-muted">Chargement…</p>
       ) : listeFiltree.length === 0 ? (
         <p className="py-10 text-center text-sm text-brand-muted">Aucun commercial dans cette catégorie.</p>
