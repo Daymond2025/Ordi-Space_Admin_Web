@@ -11,7 +11,9 @@ import {
   LIBELLE_SEGMENT_CLIENT,
   STYLE_SEGMENT_CLIENT,
   type ClientAdmin,
+  type Localite,
   type Pagination,
+  type Produit,
   type StatsClients,
   type StatutCompte,
 } from "@/lib/types";
@@ -27,6 +29,7 @@ import {
   XIcon,
 } from "@/components/icons";
 import { Listbox } from "@/components/Listbox";
+import { SelecteurProduitAchat } from "@/components/SelecteurProduitAchat";
 
 const COULEUR_EN_LIGNE = "rgb(54,206,0)";
 
@@ -93,17 +96,55 @@ function ChampFormulaire({ ...props }: React.InputHTMLAttributes<HTMLInputElemen
 /**
  * Le Client s'authentifie désormais par téléphone (WhatsApp + OTP) — plus
  * d'e-mail/mot de passe (voir Api\Auth\TelephoneAuthController côté
- * backend). Cette modale ne fait donc que créer l'identité minimale
- * (nom + téléphone) via /clients/creation-rapide, exactement comme un
- * commercial enregistrant une vente pour un nouveau client — l'admin est
- * ensuite redirigé vers la fiche du client pour y enregistrer son achat.
+ * backend). Cette modale crée l'identité minimale (nom + téléphone) via
+ * /clients/creation-rapide, et peut en plus enregistrer directement son
+ * premier achat (produit/prix/adresse) — section optionnelle : un client
+ * créé sans produit pourra toujours voir son achat enregistré plus tard
+ * depuis sa fiche (même panneau, "Enregistrer un achat").
  */
-function ModaleNouveauClient({ token, onClose, onCree }: { token: string; onClose: () => void; onCree: (clientId: number) => void }) {
+function ModaleNouveauClient({
+  token,
+  onClose,
+  onCree,
+}: {
+  token: string;
+  onClose: () => void;
+  onCree: (clientId: number, commandeId: number | null) => void;
+}) {
   const [nom, setNom] = useState("");
   const [prenom, setPrenom] = useState("");
   const [telephone, setTelephone] = useState("");
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+
+  // Section "Produit acheté" — optionnelle.
+  const [produitsVendables, setProduitsVendables] = useState<Produit[] | null>(null);
+  const [produitChoisiId, setProduitChoisiId] = useState("");
+  const [produitChoisiDetail, setProduitChoisiDetail] = useState<Produit | null>(null);
+  const [prixSaisi, setPrixSaisi] = useState("");
+  const [quantiteAchat, setQuantiteAchat] = useState("1");
+  const [localites, setLocalites] = useState<Localite[] | null>(null);
+  const [localiteId, setLocaliteId] = useState("");
+
+  useEffect(() => {
+    apiFetch<Pagination<Produit>>("/produits?statut=valide&per_page=100", { token })
+      .then((page) => setProduitsVendables(page.data.filter((p) => p.statut_produit === "valide" && p.type_livraison === "physique")))
+      .catch(() => setProduitsVendables([]));
+    apiFetch<Localite[]>("/localites", { token })
+      .then(setLocalites)
+      .catch(() => setLocalites([]));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** GET /produits/{id} : fiabilise fournisseur/prix (la liste ci-dessus ne charge pas le fournisseur). */
+  function choisirProduit(produitId: string) {
+    setProduitChoisiId(produitId);
+    setProduitChoisiDetail(null);
+    apiFetch<Produit>(`/produits/${produitId}`, { token }).then((p) => {
+      setProduitChoisiDetail(p);
+      setPrixSaisi(String(p.prix_vente ?? p.prix));
+    });
+  }
 
   async function creer() {
     setErreur(null);
@@ -114,7 +155,47 @@ function ModaleNouveauClient({ token, onClose, onCree }: { token: string; onClos
         token,
         body: { nom, prenom: prenom || null, telephone },
       });
-      onCree(client.id);
+
+      let commandeId: number | null = null;
+      if (produitChoisiId) {
+        if (!localiteId) {
+          setErreur("Choisissez une localité pour enregistrer la livraison de ce produit.");
+          setEnCours(false);
+          return;
+        }
+        // Un client tout juste créé n'a par définition aucune adresse —
+        // on en crée toujours une (POST /clients/{id}/adresses, déjà
+        // utilisé par le flux Commercial/Coordinateur).
+        const adresse = await apiFetch<{ id: number }>(`/clients/${client.id}/adresses`, {
+          method: "POST",
+          token,
+          body: { localite_id: Number(localiteId) },
+        });
+        const commande = await apiFetch<{ id: number }>("/commandes", {
+          method: "POST",
+          token,
+          body: {
+            client_id: client.id,
+            adresse_id: adresse.id,
+            lignes: [
+              {
+                produit_id: Number(produitChoisiId),
+                quantite: Number(quantiteAchat) || 1,
+                // Prix négocié — CommandeController::store() ne l'honore que pour l'Admin.
+                prix_unitaire: prixSaisi ? Number(prixSaisi) : undefined,
+              },
+            ],
+          },
+        });
+        await apiFetch(`/admin/commandes/${commande.id}/statut`, {
+          method: "PATCH",
+          token,
+          body: { statut_commande: "livree" },
+        });
+        commandeId = commande.id;
+      }
+
+      onCree(client.id, commandeId);
     } catch (e) {
       setErreur(e instanceof ApiRequestError ? e.message : "Impossible de créer ce client.");
     } finally {
@@ -122,9 +203,11 @@ function ModaleNouveauClient({ token, onClose, onCree }: { token: string; onClos
     }
   }
 
+  const pretAEnvoyer = nom.trim() && telephone.trim() && (!produitChoisiId || (prixSaisi && localiteId));
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4" onClick={onClose}>
-      <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-3xl bg-white p-6 shadow-xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-brand-ink">Nouveau client</h2>
           <button type="button" onClick={onClose} className="flex h-8 w-8 items-center justify-center rounded-full bg-[#EEF1F6] text-brand-muted">
@@ -146,10 +229,67 @@ function ModaleNouveauClient({ token, onClose, onCree }: { token: string; onClos
           <ChampFormulaire value={telephone} onChange={(e) => setTelephone(e.target.value)} placeholder="Numéro WhatsApp (ex: 07 79 36 38 09)" />
         </div>
 
+        <div className="mt-5 border-t border-brand-line pt-4">
+          <p className="text-sm font-bold text-brand-ink">Produit acheté (optionnel)</p>
+          <p className="mt-0.5 text-xs text-brand-muted">
+            Renseignez-le si ce client vient de passer une commande — sinon vous pourrez l&apos;enregistrer plus tard depuis sa fiche.
+          </p>
+
+          <div className="mt-3 flex flex-col gap-2">
+            {produitsVendables === null ? (
+              <p className="text-xs text-brand-muted">Chargement des produits…</p>
+            ) : produitsVendables.length === 0 ? (
+              <p className="text-xs text-brand-muted">Aucun ordinateur disponible à la vente pour l&apos;instant.</p>
+            ) : (
+              <SelecteurProduitAchat produits={produitsVendables} valeur={produitChoisiId} onChange={choisirProduit} />
+            )}
+
+            {produitChoisiDetail ? (
+              <>
+                <p className="text-[11px] text-brand-muted">
+                  Vendu par {produitChoisiDetail.fournisseur?.nom_entreprise ?? "Ordi'Space (direct)"}
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                  <ChampFormulaire
+                    type="number"
+                    min="1"
+                    value={quantiteAchat}
+                    onChange={(e) => setQuantiteAchat(e.target.value)}
+                    placeholder="Quantité"
+                  />
+                  <ChampFormulaire
+                    type="number"
+                    min="0"
+                    value={prixSaisi}
+                    onChange={(e) => setPrixSaisi(e.target.value)}
+                    placeholder="Prix (CFA)"
+                  />
+                </div>
+                {localites === null ? (
+                  <p className="text-xs text-brand-muted">Chargement des localités…</p>
+                ) : (
+                  <select
+                    value={localiteId}
+                    onChange={(e) => setLocaliteId(e.target.value)}
+                    className="h-11 rounded-xl border border-brand-line px-3 text-sm text-brand-ink outline-none"
+                  >
+                    <option value="">Choisir la localité de livraison</option>
+                    {localites.map((l) => (
+                      <option key={l.id} value={l.id}>
+                        {l.type === "commune_abidjan" ? `Abidjan, ${l.nom}` : l.nom}
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </>
+            ) : null}
+          </div>
+        </div>
+
         <button
           type="button"
           onClick={creer}
-          disabled={enCours || !nom.trim() || !telephone.trim()}
+          disabled={enCours || !pretAEnvoyer}
           className="bg-gradient-brand-blue mt-5 flex h-11 w-full items-center justify-center rounded-full text-sm font-semibold text-white disabled:opacity-50"
         >
           {enCours ? "Création…" : "Créer le client"}
@@ -322,13 +462,17 @@ export default function ListeClientsPage() {
         <ModaleNouveauClient
           token={token}
           onClose={() => setModaleNouveauClientOuverte(false)}
-          onCree={(clientId) => {
+          onCree={(clientId, commandeId) => {
             setModaleNouveauClientOuverte(false);
-            // Direction la fiche du nouveau client : c'est là que l'admin
-            // enregistre son premier achat (bouton déjà existant), ce qui
-            // active garantie/avantages — inchangé. Le panneau s'ouvre
-            // directement pour enchaîner sans clic supplémentaire.
-            router.push(`/clients/consultation/${clientId}?ouvrir_achat=1`);
+            // Si le produit a été renseigné dans la modale, la commande est
+            // déjà créée : on affiche juste la confirmation sur la fiche. Sinon,
+            // on ouvre directement le panneau "Enregistrer un achat" pour
+            // l'admin qui préfère le faire après coup — inchangé.
+            router.push(
+              commandeId
+                ? `/clients/consultation/${clientId}?commande_creee=${commandeId}`
+                : `/clients/consultation/${clientId}?ouvrir_achat=1`
+            );
           }}
         />
       ) : null}
