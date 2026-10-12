@@ -25,6 +25,7 @@ import {
   STYLE_STATUT_DEMANDE_SAV,
   type AbonnementGarantixDetail,
   type FicheClient as FicheClientType,
+  type Localite,
   type Pagination,
   type Produit,
 } from "@/lib/types";
@@ -51,7 +52,6 @@ import {
   WhatsAppIcon,
   XIcon,
 } from "@/components/icons";
-import { Listbox } from "@/components/Listbox";
 
 const ONGLETS = ["Activités", "Commandes", "Panier", "Maintenance", "Privilèges", "Garanties", "Formation", "Profil"] as const;
 type Onglet = (typeof ONGLETS)[number];
@@ -188,6 +188,88 @@ function FiltrePill({
   );
 }
 
+function MiniatureProduit({ produit }: { produit: Produit }) {
+  return (
+    <span className="relative h-7 w-7 shrink-0 overflow-hidden rounded-lg bg-[#EEF1F6]">
+      {produit.images[0]?.url_image ? (
+        <Image src={produit.images[0].url_image} alt="" fill className="object-cover" sizes="28px" />
+      ) : null}
+    </span>
+  );
+}
+
+/**
+ * Sélecteur produit avec miniature — dédié au panneau "Enregistrer un
+ * achat" (image/fournisseur/prix), distinct du `Listbox` partagé qui ne
+ * supporte pas d'image dans ses options.
+ */
+function SelecteurProduitAchat({
+  produits,
+  valeur,
+  onChange,
+}: {
+  produits: Produit[];
+  valeur: string;
+  onChange: (produitId: string) => void;
+}) {
+  const [ouvert, setOuvert] = useState(false);
+  const conteneurRef = useRef<HTMLDivElement>(null);
+  const choisi = produits.find((p) => String(p.id) === valeur) ?? null;
+
+  useEffect(() => {
+    if (!ouvert) return;
+    function surClicExterieur(e: MouseEvent) {
+      if (conteneurRef.current && !conteneurRef.current.contains(e.target as Node)) setOuvert(false);
+    }
+    document.addEventListener("mousedown", surClicExterieur);
+    return () => document.removeEventListener("mousedown", surClicExterieur);
+  }, [ouvert]);
+
+  return (
+    <div ref={conteneurRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOuvert((v) => !v)}
+        className="flex h-11 w-full items-center gap-2 rounded-xl border border-brand-line px-2.5 text-left text-xs text-brand-ink"
+      >
+        {choisi ? (
+          <>
+            <MiniatureProduit produit={choisi} />
+            <span className="min-w-0 flex-1 truncate">
+              {choisi.nom_produit} — {formaterPrix(choisi.prix_vente ?? choisi.prix)} CFA
+            </span>
+          </>
+        ) : (
+          <span className="flex-1 text-brand-muted">Choisir un produit…</span>
+        )}
+        <ChevronDownIcon className={`h-3.5 w-3.5 shrink-0 text-brand-muted transition-transform ${ouvert ? "rotate-180" : ""}`} />
+      </button>
+      {ouvert ? (
+        <div className="absolute left-0 right-0 top-[calc(100%+4px)] z-30 max-h-64 overflow-y-auto rounded-xl border border-brand-line bg-white p-1.5 shadow-xl">
+          {produits.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                onChange(String(p.id));
+                setOuvert(false);
+              }}
+              className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-xs ${
+                String(p.id) === valeur ? "bg-blue-50 text-[color:var(--brand-blue-end)]" : "text-brand-ink hover:bg-[#F5F7FA]"
+              }`}
+            >
+              <MiniatureProduit produit={p} />
+              <span className="min-w-0 flex-1 truncate">
+                {p.nom_produit} — {formaterPrix(p.prix_vente ?? p.prix)} CFA
+              </span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export function FicheClient({ id }: { id: string }) {
   const { token } = useAuth();
   const searchParams = useSearchParams();
@@ -205,9 +287,16 @@ export function FicheClient({ id }: { id: string }) {
   const [achatOuvert, setAchatOuvert] = useState(false);
   const [produitsVendables, setProduitsVendables] = useState<Produit[] | null>(null);
   const [produitChoisiId, setProduitChoisiId] = useState("");
+  // Rechargé via GET /produits/{id} à chaque choix — fournisseur/prix fiables
+  // (la liste GET /produits ne charge pas le fournisseur, voir ouvrirAchat()).
+  const [produitChoisiDetail, setProduitChoisiDetail] = useState<Produit | null>(null);
+  const [prixSaisi, setPrixSaisi] = useState("");
   const [quantiteAchat, setQuantiteAchat] = useState("1");
+  // Uniquement nécessaires si le client n'a encore aucune adresse enregistrée.
+  const [localites, setLocalites] = useState<Localite[] | null>(null);
+  const [localiteId, setLocaliteId] = useState("");
   const [enregistrementEnCours, setEnregistrementEnCours] = useState(false);
-  const [achatEnregistre, setAchatEnregistre] = useState(false);
+  const [commandeEnregistreeId, setCommandeEnregistreeId] = useState<number | null>(null);
 
   function rechargerFiche() {
     if (!token) return;
@@ -229,12 +318,32 @@ export function FicheClient({ id }: { id: string }) {
     setErreur(null);
     setAchatOuvert(true);
     if (!produitsVendables && token) {
-      apiFetch<Pagination<Produit>>("/produits?per_page=100", { token }).then((page) => {
+      apiFetch<Pagination<Produit>>("/produits?statut=valide&per_page=100", { token }).then((page) => {
         const liste = page.data.filter((p) => p.statut_produit === "valide" && p.type_livraison === "physique");
         setProduitsVendables(liste);
-        setProduitChoisiId(liste[0] ? String(liste[0].id) : "");
+        if (liste[0]) choisirProduit(String(liste[0].id));
       });
     }
+    if (!localites && token) {
+      apiFetch<Localite[]>("/localites", { token })
+        .then(setLocalites)
+        .catch(() => setLocalites([]));
+    }
+  }
+
+  /**
+   * GET /produits/{id} (pas la liste ci-dessus, qui ne charge pas le
+   * fournisseur) : fiabilise fournisseur + prix affichés une fois un
+   * produit choisi, et préremplit le prix (modifiable — voir prixSaisi).
+   */
+  function choisirProduit(produitId: string) {
+    setProduitChoisiId(produitId);
+    setProduitChoisiDetail(null);
+    if (!token) return;
+    apiFetch<Produit>(`/produits/${produitId}`, { token }).then((p) => {
+      setProduitChoisiDetail(p);
+      setPrixSaisi(String(p.prix_vente ?? p.prix));
+    });
   }
 
   /**
@@ -247,23 +356,43 @@ export function FicheClient({ id }: { id: string }) {
   async function enregistrerAchat() {
     if (!token || !produitChoisiId || !fiche) return;
 
-    const adresseId = fiche.profil.adresses[0]?.id;
-    if (!adresseId) {
-      setErreur("Ce client n'a aucune adresse enregistrée — ajoutez-en une (via l'app cliente ou son compte) avant d'enregistrer un achat physique.");
-      return;
-    }
-
     setErreur(null);
     setEnregistrementEnCours(true);
 
     try {
+      // Le client a déjà une adresse : on la réutilise. Sinon, la localité
+      // choisie sert à en créer une à la volée (POST /clients/{id}/adresses,
+      // déjà utilisé par le flux Commercial/Coordinateur) — plus de blocage.
+      let adresseId = fiche.profil.adresses[0]?.id ?? null;
+
+      if (!adresseId) {
+        if (!localiteId) {
+          setErreur("Choisissez une localité pour créer l'adresse de livraison.");
+          return;
+        }
+        const adresse = await apiFetch<{ id: number }>(`/clients/${id}/adresses`, {
+          method: "POST",
+          token,
+          body: { localite_id: Number(localiteId) },
+        });
+        adresseId = adresse.id;
+      }
+
       const commande = await apiFetch<{ id: number }>("/commandes", {
         method: "POST",
         token,
         body: {
           client_id: Number(id),
           adresse_id: adresseId,
-          lignes: [{ produit_id: Number(produitChoisiId), quantite: Number(quantiteAchat) || 1 }],
+          lignes: [
+            {
+              produit_id: Number(produitChoisiId),
+              quantite: Number(quantiteAchat) || 1,
+              // Prix négocié par l'Admin — CommandeController::store() ne
+              // l'honore que pour ce rôle (voir commentaire backend).
+              prix_unitaire: prixSaisi ? Number(prixSaisi) : undefined,
+            },
+          ],
         },
       });
 
@@ -274,8 +403,8 @@ export function FicheClient({ id }: { id: string }) {
       });
 
       setAchatOuvert(false);
-      setAchatEnregistre(true);
-      setTimeout(() => setAchatEnregistre(false), 2500);
+      setCommandeEnregistreeId(commande.id);
+      setTimeout(() => setCommandeEnregistreeId(null), 4000);
       apiFetch<FicheClientType>(`/admin/clients/${id}`, { token }).then(setFiche);
     } catch (e) {
       setErreur(e instanceof ApiRequestError ? e.message : "Impossible d'enregistrer cet achat.");
@@ -424,7 +553,7 @@ export function FicheClient({ id }: { id: string }) {
             {notifEnvoyee ? <p className="text-[11px] font-medium text-emerald-600">Notification envoyée ✓</p> : null}
 
             {achatOuvert ? (
-              <div className="mt-1 w-80 rounded-2xl border border-brand-line bg-white p-3 shadow-lg">
+              <div className="mt-1 w-96 rounded-2xl border border-brand-line bg-white p-3 shadow-lg">
                 <p className="mb-2 text-xs font-semibold text-brand-ink">
                   Enregistrer un achat déjà effectué (ex. vente en boutique)
                 </p>
@@ -434,22 +563,51 @@ export function FicheClient({ id }: { id: string }) {
                   <p className="text-xs text-brand-muted">Aucun ordinateur disponible à la vente pour l&apos;instant.</p>
                 ) : (
                   <div className="flex flex-col gap-2">
-                    <Listbox
-                      value={produitChoisiId}
-                      onChange={setProduitChoisiId}
-                      options={produitsVendables.map((p) => ({
-                        value: String(p.id),
-                        label: `${p.nom_produit} — ${formaterPrix(p.prix)} CFA`,
-                      }))}
-                    />
-                    <input
-                      type="number"
-                      min="1"
-                      value={quantiteAchat}
-                      onChange={(e) => setQuantiteAchat(e.target.value)}
-                      placeholder="Quantité"
-                      className="h-9 rounded-xl border border-brand-line px-2.5 text-xs outline-none focus:border-[color:var(--brand-blue-end)]"
-                    />
+                    <SelecteurProduitAchat produits={produitsVendables} valeur={produitChoisiId} onChange={choisirProduit} />
+
+                    {produitChoisiDetail ? (
+                      <p className="text-[11px] text-brand-muted">
+                        Vendu par {produitChoisiDetail.fournisseur?.nom_entreprise ?? "Ordi'Space (direct)"}
+                      </p>
+                    ) : null}
+
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        min="1"
+                        value={quantiteAchat}
+                        onChange={(e) => setQuantiteAchat(e.target.value)}
+                        placeholder="Quantité"
+                        className="h-9 rounded-xl border border-brand-line px-2.5 text-xs outline-none focus:border-[color:var(--brand-blue-end)]"
+                      />
+                      <input
+                        type="number"
+                        min="0"
+                        value={prixSaisi}
+                        onChange={(e) => setPrixSaisi(e.target.value)}
+                        placeholder="Prix (CFA)"
+                        className="h-9 rounded-xl border border-brand-line px-2.5 text-xs outline-none focus:border-[color:var(--brand-blue-end)]"
+                      />
+                    </div>
+
+                    {fiche && fiche.profil.adresses.length === 0 ? (
+                      localites === null ? (
+                        <p className="text-[11px] text-brand-muted">Chargement des localités…</p>
+                      ) : (
+                        <select
+                          value={localiteId}
+                          onChange={(e) => setLocaliteId(e.target.value)}
+                          className="h-9 rounded-xl border border-brand-line px-2.5 text-xs text-brand-ink outline-none"
+                        >
+                          <option value="">Choisir la localité de livraison</option>
+                          {localites.map((l) => (
+                            <option key={l.id} value={l.id}>
+                              {l.type === "commune_abidjan" ? `Abidjan, ${l.nom}` : l.nom}
+                            </option>
+                          ))}
+                        </select>
+                      )
+                    ) : null}
                   </div>
                 )}
                 <div className="mt-2 flex justify-end gap-2">
@@ -459,7 +617,12 @@ export function FicheClient({ id }: { id: string }) {
                   <button
                     type="button"
                     onClick={enregistrerAchat}
-                    disabled={enregistrementEnCours || !produitChoisiId}
+                    disabled={
+                      enregistrementEnCours ||
+                      !produitChoisiId ||
+                      !prixSaisi ||
+                      (fiche?.profil.adresses.length === 0 && !localiteId)
+                    }
                     className="rounded-full bg-brand-ink px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
                   >
                     {enregistrementEnCours ? "Enregistrement…" : "Enregistrer"}
@@ -467,7 +630,11 @@ export function FicheClient({ id }: { id: string }) {
                 </div>
               </div>
             ) : null}
-            {achatEnregistre ? <p className="text-[11px] font-medium text-emerald-600">Achat enregistré ✓ — garantie activée</p> : null}
+            {commandeEnregistreeId ? (
+              <p className="text-[11px] font-medium text-emerald-600">
+                Commande n°{commandeEnregistreeId} enregistrée ✓ — garantie activée
+              </p>
+            ) : null}
           </div>
         </div>
 

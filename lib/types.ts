@@ -521,6 +521,9 @@ export type QuestionFrequente = {
 
 export type AdresseClient = { id: number; libelle: string | null; rue: string; ville: string; pays: string };
 
+/** GET /localites — pour créer une adresse à la volée (ex. "Enregistrer un achat" sans adresse existante). */
+export type Localite = { id: number; nom: string; type: string };
+
 export type LignePanierAdmin = { id: number; quantite: number; produit: Produit; created_at: string };
 
 export type ProfilClientDetail = {
