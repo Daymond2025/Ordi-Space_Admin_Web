@@ -5,7 +5,7 @@ import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiRequestError } from "@/lib/api";
-import type { Categorie, Produit } from "@/lib/types";
+import type { Categorie, FournisseurAdmin, Pagination, Produit } from "@/lib/types";
 import { CheckIcon, ChevronLeftIcon, ImagePlaceholderIcon, XIcon } from "@/components/icons";
 import { Listbox } from "@/components/Listbox";
 import { AjoutCategorieRapide } from "@/components/AjoutCategorieRapide";
@@ -101,6 +101,8 @@ export default function NouveauProduitPage() {
 
   const [categories, setCategories] = useState<Categorie[]>([]);
   const [categorieId, setCategorieId] = useState("");
+  const [fournisseurs, setFournisseurs] = useState<FournisseurAdmin[]>([]);
+  const [fournisseurId, setFournisseurId] = useState("");
   const [nom, setNom] = useState("");
   const [description, setDescription] = useState("");
   const [prix, setPrix] = useState("");
@@ -117,6 +119,9 @@ export default function NouveauProduitPage() {
   useEffect(() => {
     if (!token) return;
     apiFetch<Categorie[]>("/categories", { token }).then(setCategories).catch(() => setCategories([]));
+    apiFetch<Pagination<FournisseurAdmin>>("/fournisseurs?per_page=100", { token })
+      .then((page) => setFournisseurs(page.data))
+      .catch(() => setFournisseurs([]));
   }, [token]);
 
   const etapes = useMemo(
@@ -168,6 +173,7 @@ export default function NouveauProduitPage() {
 
     const donnees = new FormData();
     donnees.append("categorie_id", categorieId);
+    if (fournisseurId) donnees.append("fournisseur_id", fournisseurId);
     donnees.append("nom_produit", nom);
     if (description) donnees.append("description", description);
     donnees.append("prix", prix);
@@ -232,6 +238,16 @@ export default function NouveauProduitPage() {
           <div className="flex flex-col gap-1.5">
             <Etiquette>Nom du produit</Etiquette>
             <input value={nom} onChange={(e) => setNom(e.target.value)} className={CHAMP} placeholder="Ex. HP EliteBook 840 G5 Core i5" />
+          </div>
+
+          <div className="flex flex-col gap-1.5">
+            <Etiquette>Fournisseur (optionnel)</Etiquette>
+            <Listbox
+              value={fournisseurId}
+              onChange={setFournisseurId}
+              placeholder="Aucun (Ordi'Space direct)"
+              options={fournisseurs.map((f) => ({ value: String(f.user_id), label: f.nom_entreprise }))}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">

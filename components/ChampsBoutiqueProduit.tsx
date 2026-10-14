@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { apiFetch } from "@/lib/api";
+import { useState } from "react";
 import { formaterPrix, type Produit } from "@/lib/types";
 import { Listbox } from "@/components/Listbox";
+import { BaremeLivraison } from "@/components/BaremeLivraison";
 
 /**
  * Champs d'une fiche produit qui alimentent la Boutique des livreurs et son écran
@@ -24,7 +24,7 @@ export type ChampsBoutique = {
   prixVente: string;
   prixBarre: string;
   reduction: string;
-  commissionRevente: string;
+  commissionApporteur: string;
   /** id de localité → frais saisis ; vide = localité non livrée. */
   frais: Record<number, string>;
   /** Incitation marketing (liste prédéfinie côté mobile, ici texte libre — même effet). */
@@ -46,13 +46,24 @@ export const CHAMPS_BOUTIQUE_VIDES: ChampsBoutique = {
   prixVente: "",
   prixBarre: "",
   reduction: "",
-  commissionRevente: "",
+  commissionApporteur: "",
   frais: {},
   cadeaux: [],
   contenuPack: [],
 };
 
 const MARQUES_SUGGEREES = ["HP", "Dell", "Lenovo", "Macbook", "Asus", "Toshiba", "Chromebook"];
+
+const CADEAUX_DISPONIBLES = [
+  "Sac",
+  "Souris",
+  "Adobe Creative Cloud + compatible",
+  "15 logiciels",
+  "10 logiciels",
+  "Antivirus installé",
+  "Windows 10",
+  "Windows 11",
+];
 
 const ETATS = [
   { value: "", label: "Non précisé" },
@@ -66,6 +77,14 @@ const CHAMP = "h-11 w-full rounded-xl border border-brand-line px-3 text-sm";
 
 const texte = (valeur: string | null | undefined) => valeur ?? "";
 const nombre = (valeur: string): number | null => (valeur.trim() === "" ? null : Number(valeur));
+
+/** % d'écart entre prix barré et prix de vente, arrondi — vide si l'un des deux manque ou est incohérent. */
+function calculerReduction(prixVenteStr: string, prixBarreStr: string): string {
+  const prixVente = Number(prixVenteStr);
+  const prixBarre = Number(prixBarreStr);
+  if (!prixVenteStr.trim() || !prixBarreStr.trim() || prixBarre <= 0 || prixVente >= prixBarre) return "";
+  return String(Math.round(((prixBarre - prixVente) / prixBarre) * 100));
+}
 
 /** Valeurs d'un produit existant (le backend renvoie les décimaux en "380000.00"). */
 export function champsDepuisProduit(p: Produit): ChampsBoutique {
@@ -83,7 +102,7 @@ export function champsDepuisProduit(p: Produit): ChampsBoutique {
     prixVente: entier(p.prix_vente),
     prixBarre: entier(p.prix_barre),
     reduction: p.pourcentage_reduction === null ? "" : String(p.pourcentage_reduction),
-    commissionRevente: entier(p.commission_revente),
+    commissionApporteur: entier(p.commission_apporteur),
     frais: Object.fromEntries((p.frais_livraison ?? []).filter((f) => f.localite).map((f) => [f.localite!.id, entier(f.montant)])),
     cadeaux: p.cadeaux ?? [],
     contenuPack: p.contenu_pack ?? [],
@@ -112,7 +131,7 @@ export function champsVersCorps(c: ChampsBoutique): Record<string, unknown> {
     prix_vente: nombre(c.prixVente),
     prix_barre: nombre(c.prixBarre),
     pourcentage_reduction: nombre(c.reduction),
-    commission_revente: nombre(c.commissionRevente),
+    commission_apporteur: nombre(c.commissionApporteur),
     cadeaux: c.cadeaux,
     contenu_pack: c.contenuPack,
     // Remplacement complet du barème ; omis, il reste tel quel (voir ProduitController::update()).
@@ -152,32 +171,61 @@ function ChampTexte({ libelle, valeur, onChange, type = "text", suffixe }: { lib
   );
 }
 
-/** Liste de tags en texte libre (cadeaux, contenu du pack) — saisie + Entrée, retirables. */
+/**
+ * Liste de tags (cadeaux, contenu du pack) — retirables. Saisie libre +
+ * Entrée toujours disponible ; si `optionsPredefinies` est fourni, un
+ * sélecteur rapide s'ajoute au-dessus (ex. liste de cadeaux standard),
+ * alimentant la même liste que la saisie libre.
+ */
 function ChampTags({
   libelle,
   description,
   placeholder,
   valeurs,
   onChange,
+  optionsPredefinies,
 }: {
   libelle: string;
   description?: string;
   placeholder: string;
   valeurs: string[];
   onChange: (v: string[]) => void;
+  optionsPredefinies?: string[];
 }) {
   const [saisie, setSaisie] = useState("");
 
+  function ajouterValeur(valeur: string) {
+    const v = valeur.trim();
+    if (!v || valeurs.includes(v)) return;
+    onChange([...valeurs, v]);
+  }
+
   function ajouter() {
-    const valeur = saisie.trim();
-    if (!valeur || valeurs.includes(valeur)) return;
-    onChange([...valeurs, valeur]);
+    ajouterValeur(saisie);
     setSaisie("");
   }
 
   return (
     <Champ libelle={libelle}>
       {description ? <p className="-mt-1 text-xs text-brand-muted">{description}</p> : null}
+      {optionsPredefinies ? (
+        <select
+          value=""
+          onChange={(e) => {
+            if (e.target.value) ajouterValeur(e.target.value);
+          }}
+          className={CHAMP}
+        >
+          <option value="">Ajouter un cadeau…</option>
+          {optionsPredefinies
+            .filter((option) => !valeurs.includes(option))
+            .map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+        </select>
+      ) : null}
       <div className="flex gap-2">
         <input
           value={saisie}
@@ -277,10 +325,24 @@ export function SectionVente({
         <Champ libelle="État du produit">
           <Listbox value={valeurs.etat} onChange={(v) => maj({ etat: v })} options={ETATS} />
         </Champ>
-        <ChampTexte libelle="Prix de vente" suffixe="CFA" type="number" valeur={valeurs.prixVente} onChange={(v) => maj({ prixVente: v })} />
-        <ChampTexte libelle="Prix barré (référence)" suffixe="CFA" type="number" valeur={valeurs.prixBarre} onChange={(v) => maj({ prixBarre: v })} />
-        <ChampTexte libelle="Réduction affichée" suffixe="%" type="number" valeur={valeurs.reduction} onChange={(v) => maj({ reduction: v })} />
-        <ChampTexte libelle="Commission du livreur" suffixe="CFA" type="number" valeur={valeurs.commissionRevente} onChange={(v) => maj({ commissionRevente: v })} />
+        <ChampTexte
+          libelle="Prix de vente"
+          suffixe="CFA"
+          type="number"
+          valeur={valeurs.prixVente}
+          onChange={(v) => maj({ prixVente: v, reduction: calculerReduction(v, valeurs.prixBarre) })}
+        />
+        <ChampTexte
+          libelle="Prix barré (référence)"
+          suffixe="CFA"
+          type="number"
+          valeur={valeurs.prixBarre}
+          onChange={(v) => maj({ prixBarre: v, reduction: calculerReduction(valeurs.prixVente, v) })}
+        />
+        <Champ libelle="Réduction affichée (%)">
+          <div className={`${CHAMP} flex items-center bg-[#F5F7FA] text-brand-muted`}>{valeurs.reduction || "0"}%</div>
+        </Champ>
+        <ChampTexte libelle="Commission apporteur d'affaire" suffixe="CFA" type="number" valeur={valeurs.commissionApporteur} onChange={(v) => maj({ commissionApporteur: v })} />
       </div>
 
       {commissionOrdispace !== null && commissionOrdispace !== undefined ? (
@@ -296,17 +358,32 @@ export function SectionVente({
 export function SectionCadeauxPack({ valeurs, onChange }: ProprietesSection) {
   const maj = (patch: Partial<ChampsBoutique>) => onChange({ ...valeurs, ...patch });
 
+  /** Pack complet = cadeaux sélectionnés ∪ ajout manuel propre au pack (ex. "Sacoche") — retirer un cadeau le retire aussi du pack. */
+  function changerCadeaux(nouveauxCadeaux: string[]) {
+    const ajoutManuelPack = valeurs.contenuPack.filter((v) => !valeurs.cadeaux.includes(v));
+    maj({ cadeaux: nouveauxCadeaux, contenuPack: Array.from(new Set([...nouveauxCadeaux, ...ajoutManuelPack])) });
+  }
+
   return (
     <section className="flex flex-col gap-4">
       <div>
         <p className="text-sm font-bold text-brand-ink">Cadeaux &amp; Pack complet</p>
-        <p className="text-xs text-brand-muted">Deux listes distinctes : les cadeaux (incitation marketing) et le contenu matériel du carton.</p>
+        <p className="text-xs text-brand-muted">
+          Choisissez un ou plusieurs cadeaux standards, ou saisissez-en un personnalisé — le pack complet se compose automatiquement de ces cadeaux.
+        </p>
       </div>
 
       <div className="grid grid-cols-2 gap-4">
-        <ChampTags libelle="Cadeaux" placeholder="Ex. Souris" valeurs={valeurs.cadeaux} onChange={(v) => maj({ cadeaux: v })} />
+        <ChampTags
+          libelle="Cadeaux"
+          placeholder="Ou saisir un cadeau personnalisé"
+          valeurs={valeurs.cadeaux}
+          onChange={changerCadeaux}
+          optionsPredefinies={CADEAUX_DISPONIBLES}
+        />
         <ChampTags
           libelle="Pack complet"
+          description="Composé automatiquement des cadeaux ci-contre — ajoutez ici un élément matériel en plus (ex. Sacoche de transport)."
           placeholder="Ex. Sacoche de transport"
           valeurs={valeurs.contenuPack}
           onChange={(v) => maj({ contenuPack: v })}
@@ -317,54 +394,16 @@ export function SectionCadeauxPack({ valeurs, onChange }: ProprietesSection) {
 }
 
 export function SectionFraisLivraison({ valeurs, onChange, token }: ProprietesSection & { token: string | null }) {
-  const [localites, setLocalites] = useState<{ id: number; nom: string }[] | null>(null);
   const maj = (patch: Partial<ChampsBoutique>) => onChange({ ...valeurs, ...patch });
-
-  useEffect(() => {
-    if (!token) return;
-    let annule = false;
-    apiFetch<{ id: number; nom: string }[]>("/localites", { token })
-      .then((liste) => {
-        if (!annule) setLocalites(liste);
-      })
-      .catch(() => {
-        if (!annule) setLocalites([]);
-      });
-    return () => {
-      annule = true;
-    };
-  }, [token]);
 
   return (
     <section className="flex flex-col gap-3">
       <div>
         <p className="text-sm font-bold text-brand-ink">Frais de livraison</p>
-        <p className="text-xs text-brand-muted">Renseignez les localités livrées — les autres restent indisponibles (commande impossible).</p>
+        <p className="text-xs text-brand-muted">Un montant de départ par zone, appliqué à toutes les localités concernées.</p>
       </div>
 
-      {localites === null ? (
-        <p className="text-xs text-brand-muted">Chargement des localités…</p>
-      ) : (
-        <div className="grid max-h-80 grid-cols-2 gap-x-6 gap-y-2 overflow-y-auto pr-1">
-          {localites.map((localite) => (
-            <label key={localite.id} className="flex items-center gap-3">
-              <span className="min-w-0 flex-1 truncate text-sm text-brand-ink">{localite.nom}</span>
-              <span className="flex w-32 shrink-0 items-center rounded-xl border border-brand-line px-3">
-                <input
-                  type="number"
-                  min={0}
-                  value={valeurs.frais[localite.id] ?? ""}
-                  onChange={(e) => maj({ frais: { ...valeurs.frais, [localite.id]: e.target.value } })}
-                  placeholder="—"
-                  aria-label={`Frais de livraison ${localite.nom}`}
-                  className="h-9 min-w-0 flex-1 bg-transparent text-right text-sm outline-none"
-                />
-                <span className="ml-1.5 text-[11px] text-brand-muted">CFA</span>
-              </span>
-            </label>
-          ))}
-        </div>
-      )}
+      <BaremeLivraison token={token} valeurs={valeurs.frais} onChange={(frais) => maj({ frais })} />
     </section>
   );
 }

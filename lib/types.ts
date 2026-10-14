@@ -78,7 +78,7 @@ export type Produit = {
   carte_graphique: string | null;
   couleur: string | null;
   prix_vente: string | null;
-  commission_revente: string | null;
+  commission_apporteur: string | null;
   prix_barre: string | null;
   pourcentage_reduction: number | null;
   frais_livraison?: { montant: string; localite: { id: number; nom: string } | null }[];
