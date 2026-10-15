@@ -20,18 +20,21 @@ const LIBELLE_ROLE: Record<Role, string> = {
   fournisseur: "fournisseur",
   livreur: "livreur",
   commercial: "commercial",
+  technicien_maintenance: "technicien",
 };
 
-type Role = "coordinateur" | "fournisseur" | "livreur" | "commercial";
+type Role = "coordinateur" | "fournisseur" | "livreur" | "commercial" | "technicien_maintenance";
 
 /**
- * Création manuelle d'un Coordinateur/Fournisseur/Livreur/Commercial par
- * l'Admin — même principe que "Nouveau client" (ModaleNouveauClient dans
- * clients/liste), mais POST /admin/utilisateurs
+ * Création manuelle d'un Coordinateur/Fournisseur/Livreur/Commercial/
+ * Technicien par l'Admin — même principe que "Nouveau client"
+ * (ModaleNouveauClient dans clients/liste), mais POST /admin/utilisateurs
  * (UtilisateurController::provisionner()). Coordinateur n'a pas de connexion
  * par téléphone/OTP ; Fournisseur/Livreur/Commercial ont leur propre
  * auto-inscription mais l'admin peut aussi en créer un directement — un mot
- * de passe est donc exigé ici dans tous les cas. CRUD complet côté admin,
+ * de passe est donc exigé pour ces rôles. Le Technicien est l'exception :
+ * app Maintenancier = téléphone+OTP uniquement, donc ni e-mail ni mot de
+ * passe ici, téléphone obligatoire à la place. CRUD complet côté admin,
  * comme pour un client.
  */
 export function ModaleProvisionnerUtilisateur({
@@ -54,13 +57,21 @@ export function ModaleProvisionnerUtilisateur({
   const [typeVehicule, setTypeVehicule] = useState("");
   const [zoneCouverture, setZoneCouverture] = useState("");
   const [localisation, setLocalisation] = useState("");
+  const [specialite, setSpecialite] = useState("");
   const [photo, setPhoto] = useState<File | null>(null);
   const [apercuPhoto, setApercuPhoto] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const inputPhotoRef = useRef<HTMLInputElement>(null);
 
-  const pretAEnvoyer = nom.trim() && email.trim() && motDePasse.trim() && (role !== "fournisseur" || nomEntreprise.trim());
+  // Technicien : connexion par téléphone+OTP uniquement (app Maintenancier),
+  // ni e-mail ni mot de passe — téléphone et spécialité exigés à la place.
+  const estTechnicien = role === "technicien_maintenance";
+  const pretAEnvoyer = Boolean(
+    nom.trim() &&
+      (estTechnicien ? telephone.trim() && specialite.trim() : email.trim() && motDePasse.trim()) &&
+      (role !== "fournisseur" || nomEntreprise.trim())
+  );
 
   // Aperçu en data: URL (FileReader), pas un object URL "blob:" — la CSP de
   // l'app (next.config.ts) n'autorise que 'self'/data: en img-src.
@@ -79,13 +90,14 @@ export function ModaleProvisionnerUtilisateur({
       const champs: Record<string, string | null> = {
         nom,
         prenom: prenom || null,
-        email,
+        email: estTechnicien ? null : email,
         telephone: telephone || null,
-        password: motDePasse,
+        password: estTechnicien ? null : motDePasse,
         type_utilisateur: role,
         ...(role === "fournisseur" ? { nom_entreprise: nomEntreprise } : {}),
         ...(role === "livreur" ? { type_vehicule: typeVehicule || null, zone_couverture: zoneCouverture || null } : {}),
         ...(role === "commercial" ? { nom_entreprise: nomEntreprise || null, localisation: localisation || null } : {}),
+        ...(estTechnicien ? { specialite } : {}),
       };
 
       let body: unknown = champs;
@@ -118,7 +130,9 @@ export function ModaleProvisionnerUtilisateur({
         </div>
 
         <p className="mt-2 text-xs text-brand-muted">
-          Compte créé directement par l&apos;équipe — {LIBELLE_ROLE[role]} pourra se connecter avec cet e-mail et ce mot de passe.
+          {estTechnicien
+            ? "Compte créé directement par l'équipe — le technicien se connectera par téléphone + code reçu sur WhatsApp, aucun mot de passe."
+            : `Compte créé directement par l'équipe — ${LIBELLE_ROLE[role]} pourra se connecter avec cet e-mail et ce mot de passe.`}
         </p>
 
         {erreur ? <p className="mt-3 rounded-xl bg-rose-50 px-3 py-2 text-xs text-rose-600">{erreur}</p> : null}
@@ -154,15 +168,26 @@ export function ModaleProvisionnerUtilisateur({
             <input value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom" className={CHAMP} />
             <input value={prenom} onChange={(e) => setPrenom(e.target.value)} placeholder="Prénom (optionnel)" className={CHAMP} />
           </div>
-          <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" className={CHAMP} />
-          <input value={telephone} onChange={(e) => setTelephone(e.target.value)} placeholder="Téléphone (optionnel)" className={CHAMP} />
+          {estTechnicien ? null : <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" className={CHAMP} />}
           <input
-            type="password"
-            value={motDePasse}
-            onChange={(e) => setMotDePasse(e.target.value)}
-            placeholder="Mot de passe (8 car. min, majuscule + chiffre)"
+            value={telephone}
+            onChange={(e) => setTelephone(e.target.value)}
+            placeholder={estTechnicien ? "Téléphone (WhatsApp, obligatoire)" : "Téléphone (optionnel)"}
             className={CHAMP}
           />
+          {estTechnicien ? null : (
+            <input
+              type="password"
+              value={motDePasse}
+              onChange={(e) => setMotDePasse(e.target.value)}
+              placeholder="Mot de passe (8 car. min, majuscule + chiffre)"
+              className={CHAMP}
+            />
+          )}
+
+          {estTechnicien ? (
+            <input value={specialite} onChange={(e) => setSpecialite(e.target.value)} placeholder="Spécialité (ex. Matériel, Réseau…)" className={CHAMP} />
+          ) : null}
 
           {role === "fournisseur" ? (
             <input value={nomEntreprise} onChange={(e) => setNomEntreprise(e.target.value)} placeholder="Nom de l'entreprise" className={CHAMP} />

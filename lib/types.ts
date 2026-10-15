@@ -1244,6 +1244,17 @@ export type CoordinateurDetailAdmin = CoordinateurAdmin & {
   statistiques: { commandes_validees: number; produits_valides: number; activites: number };
 };
 
+// --- Techniciens de maintenance (création admin, GET /sav/techniciens — RendezVousController) ----------
+
+export type TechnicienAdmin = {
+  user_id: number;
+  nom: string;
+  prenom: string | null;
+  telephone: string | null;
+  specialite: string | null;
+  statut_compte: StatutCompte;
+};
+
 // --- Dashboard général (GET /admin/statistiques/tableau-de-bord) ----------
 
 export type TableauDeBordGeneral = {

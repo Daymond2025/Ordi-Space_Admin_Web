@@ -81,6 +81,7 @@ export const SECTIONS_SECONDAIRES: Record<string, SectionSecondaire> = {
           { label: "Tutos & Formations", href: "/clients/contenu" },
           { label: "Déclarations de panne", href: "/clients/declarations-panne" },
           { label: "Maintenance", href: "/clients/maintenance" },
+          { label: "Techniciens", href: "/clients/techniciens" },
           { label: "Assistance", href: "/clients/assistance" },
           { label: "Aide rapide (messagerie)", href: "/clients/aide-rapide" },
         ],
