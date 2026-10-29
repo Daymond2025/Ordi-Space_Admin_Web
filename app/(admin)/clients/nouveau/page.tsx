@@ -20,11 +20,18 @@ import {
 import { Listbox } from "@/components/Listbox";
 import { SelecteurProduitAchat } from "@/components/SelecteurProduitAchat";
 
+// Valeur encodée "<montant><unité>" (j = jours, m = mois) — voir
+// decoderDureeGarantie(). Les durées courtes (semaines) sont envoyées en
+// jours exacts au backend, les durées longues restent en mois comme avant.
 const OPTIONS_GARANTIE = [
-  { value: "3", label: "3 mois" },
-  { value: "6", label: "6 mois" },
-  { value: "12", label: "12 mois" },
-  { value: "24", label: "24 mois" },
+  { value: "7j", label: "1 semaine" },
+  { value: "14j", label: "2 semaines" },
+  { value: "21j", label: "3 semaines" },
+  { value: "1m", label: "1 mois" },
+  { value: "3m", label: "3 mois" },
+  { value: "6m", label: "6 mois" },
+  { value: "12m", label: "12 mois" },
+  { value: "24m", label: "24 mois" },
 ];
 
 const FORMATEUR_DATE_COURTE = new Intl.DateTimeFormat("fr-FR", { day: "numeric", month: "short", year: "numeric" });
@@ -33,6 +40,19 @@ function ajouterMois(date: Date, mois: number): Date {
   const d = new Date(date);
   d.setMonth(d.getMonth() + mois);
   return d;
+}
+
+function ajouterJours(date: Date, jours: number): Date {
+  const d = new Date(date);
+  d.setDate(d.getDate() + jours);
+  return d;
+}
+
+/** Décode une valeur d'OPTIONS_GARANTIE ("7j", "3m"...) en montant + unité. */
+function decoderDureeGarantie(valeur: string): { unite: "jours" | "mois"; montant: number } | null {
+  const correspondance = valeur.match(/^(\d+)(j|m)$/);
+  if (!correspondance) return null;
+  return { unite: correspondance[2] === "j" ? "jours" : "mois", montant: Number(correspondance[1]) };
 }
 
 function Champ({
@@ -202,7 +222,9 @@ export default function NouvelleCommandePage() {
               produit_id: Number(produitId),
               quantite: Number(quantite),
               prix_unitaire: Number(prixUnitaire),
-              duree_garantie_mois: Number(dureeGarantie),
+              ...(decoderDureeGarantie(dureeGarantie)?.unite === "jours"
+                ? { duree_garantie_jours: decoderDureeGarantie(dureeGarantie)?.montant }
+                : { duree_garantie_mois: decoderDureeGarantie(dureeGarantie)?.montant }),
             },
           ],
           frais_livraison: Number(fraisLivraison),
@@ -225,7 +247,14 @@ export default function NouvelleCommandePage() {
 
   const livreurChoisi = livreurs?.find((l) => String(l.id) === livreurId) ?? null;
   const dateAchatFormatee = FORMATEUR_DATE_COURTE.format(new Date());
-  const dateFinGarantieFormatee = dureeGarantie ? FORMATEUR_DATE_COURTE.format(ajouterMois(new Date(), Number(dureeGarantie))) : null;
+  const dureeGarantieDecodee = dureeGarantie ? decoderDureeGarantie(dureeGarantie) : null;
+  const dateFinGarantieFormatee = dureeGarantieDecodee
+    ? FORMATEUR_DATE_COURTE.format(
+        dureeGarantieDecodee.unite === "jours"
+          ? ajouterJours(new Date(), dureeGarantieDecodee.montant)
+          : ajouterMois(new Date(), dureeGarantieDecodee.montant)
+      )
+    : null;
 
   return (
     <div className="flex flex-col gap-5">
@@ -484,7 +513,9 @@ export default function NouvelleCommandePage() {
                 <ShieldCheckIcon className="h-3.5 w-3.5 shrink-0 translate-y-0.5" />
                 <span>
                   Durée de garantie :{" "}
-                  <span className="font-semibold text-brand-ink">{dureeGarantie ? `${dureeGarantie} mois` : "—"}</span>
+                  <span className="font-semibold text-brand-ink">
+                    {OPTIONS_GARANTIE.find((o) => o.value === dureeGarantie)?.label ?? "—"}
+                  </span>
                   {dureeGarantie && dateFinGarantieFormatee ? (
                     <span className="block text-[11px] text-brand-muted">
                       Du {dateAchatFormatee} au {dateFinGarantieFormatee}
