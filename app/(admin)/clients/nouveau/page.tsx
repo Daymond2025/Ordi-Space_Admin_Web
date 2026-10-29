@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formaterPrix, type Localite, type Pagination, type Produit, type UtilisateurAdmin } from "@/lib/types";
@@ -15,6 +15,7 @@ import {
   LivreursIcon,
   PlusIcon,
   ShieldCheckIcon,
+  TrashIcon,
   UserAvatarIcon,
 } from "@/components/icons";
 import { Listbox } from "@/components/Listbox";
@@ -53,6 +54,22 @@ function decoderDureeGarantie(valeur: string): { unite: "jours" | "mois"; montan
   const correspondance = valeur.match(/^(\d+)(j|m)$/);
   if (!correspondance) return null;
   return { unite: correspondance[2] === "j" ? "jours" : "mois", montant: Number(correspondance[1]) };
+}
+
+// Une commande peut contenir plusieurs produits (ex. deux ordinateurs pour
+// le même client) — chaque ligne a son propre produit, prix, quantité et
+// durée de garantie négociée, comme autant de lignes_commande côté backend.
+type LigneProduit = {
+  id: number;
+  produitId: string;
+  produitDetail: Produit | null;
+  prixUnitaire: string;
+  quantite: string;
+  dureeGarantie: string;
+};
+
+function ligneVide(id: number): LigneProduit {
+  return { id, produitId: "", produitDetail: null, prixUnitaire: "", quantite: "1", dureeGarantie: "" };
 }
 
 function Champ({
@@ -123,20 +140,31 @@ export default function NouvelleCommandePage() {
   const [localiteId, setLocaliteId] = useState("");
 
   const [produits, setProduits] = useState<Produit[] | null>(null);
-  const [produitId, setProduitId] = useState("");
-  const [produitDetail, setProduitDetail] = useState<Produit | null>(null);
-  const [prixUnitaire, setPrixUnitaire] = useState("");
-  const [quantite, setQuantite] = useState("1");
+  const prochainIdLigne = useRef(1);
+  const [lignes, setLignes] = useState<LigneProduit[]>([ligneVide(0)]);
   const [fraisLivraison, setFraisLivraison] = useState("");
+  const [fraisLivraisonModifieManuellement, setFraisLivraisonModifieManuellement] = useState(false);
 
   const [dateLivraison, setDateLivraison] = useState("");
   const [heureLivraison, setHeureLivraison] = useState("");
   const [livreurs, setLivreurs] = useState<UtilisateurAdmin[] | null>(null);
   const [livreurId, setLivreurId] = useState("");
-  const [dureeGarantie, setDureeGarantie] = useState("");
 
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+
+  function mettreAJourLigne(id: number, champ: Partial<Omit<LigneProduit, "id">>) {
+    setLignes((prev) => prev.map((l) => (l.id === id ? { ...l, ...champ } : l)));
+  }
+
+  function ajouterLigne() {
+    const id = prochainIdLigne.current++;
+    setLignes((prev) => [...prev, ligneVide(id)]);
+  }
+
+  function retirerLigne(id: number) {
+    setLignes((prev) => (prev.length > 1 ? prev.filter((l) => l.id !== id) : prev));
+  }
 
   useEffect(() => {
     if (!token) return;
@@ -149,48 +177,60 @@ export default function NouvelleCommandePage() {
       .catch(() => setLivreurs([]));
   }, [token]);
 
-  function choisirProduit(id: string) {
+  function choisirProduit(ligneId: number, produitId: string) {
     if (!token) return;
-    setProduitId(id);
-    setProduitDetail(null);
-    apiFetch<Produit>(`/produits/${id}`, { token }).then((p) => {
-      setProduitDetail(p);
-      setPrixUnitaire(String(p.prix_vente ?? p.prix));
-    });
+    mettreAJourLigne(ligneId, { produitId, produitDetail: null });
+    apiFetch<Produit>(`/produits/${produitId}`, { token })
+      .then((p) => {
+        mettreAJourLigne(ligneId, { produitDetail: p, prixUnitaire: String(p.prix_vente ?? p.prix) });
+      })
+      .catch((e) => {
+        setErreur(e instanceof ApiRequestError ? e.message : "Impossible de récupérer ce produit, réessaie.");
+      });
   }
 
   // Préremplit les frais à partir du vrai barème dès que produit + localité
-  // sont connus — l'admin peut ensuite l'ajuster (vente négociée par
-  // téléphone, même logique que le prix). Si aucun tarif n'est configuré
-  // pour ce couple, on laisse le champ vide plutôt que de bloquer l'écran.
+  // sont connus, en sommant chaque ligne (même logique que
+  // calculerFraisLivraison() côté backend : un tarif par ligne, pas par
+  // produit distinct ni multiplié par la quantité). L'admin peut ensuite
+  // l'ajuster (vente négociée par téléphone, même logique que le prix) — on
+  // ne retouche plus le champ une fois qu'il l'a modifié à la main.
+  const produitIds = lignes.map((l) => l.produitId).join(",");
   useEffect(() => {
-    if (!token || !produitId || !localiteId) return;
+    if (!token || !localiteId || fraisLivraisonModifieManuellement) return;
+    const idsValides = lignes.map((l) => l.produitId).filter(Boolean);
+    if (idsValides.length === 0) return;
+
     let annule = false;
-    apiFetch<{ frais_livraison: number }>(`/produits/${produitId}/frais-livraison?localite_id=${localiteId}`, { token })
-      .then((r) => {
-        if (!annule) setFraisLivraison(String(r.frais_livraison));
-      })
-      .catch(() => {});
+    Promise.all(
+      idsValides.map((id) =>
+        apiFetch<{ frais_livraison: number }>(`/produits/${id}/frais-livraison?localite_id=${localiteId}`, { token }).catch(() => null)
+      )
+    ).then((resultats) => {
+      if (annule) return;
+      const total = resultats.reduce((somme, r) => somme + (r?.frais_livraison ?? 0), 0);
+      setFraisLivraison(String(total));
+    });
     return () => {
       annule = true;
     };
-  }, [token, produitId, localiteId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- produitIds résume déjà lignes[].produitId pour cet effet
+  }, [token, localiteId, produitIds, fraisLivraisonModifieManuellement]);
 
-  const montantTotal = (Number(prixUnitaire) || 0) * (Number(quantite) || 0) + (Number(fraisLivraison) || 0);
+  const montantProduits = lignes.reduce((somme, l) => somme + (Number(l.prixUnitaire) || 0) * (Number(l.quantite) || 0), 0);
+  const montantTotal = montantProduits + (Number(fraisLivraison) || 0);
 
   const pretAEnvoyer = Boolean(
     nom.trim() &&
       prenom.trim() &&
       telephone.trim() &&
       localiteId &&
-      produitId &&
-      prixUnitaire &&
-      quantite &&
+      lignes.length > 0 &&
+      lignes.every((l) => l.produitId && l.prixUnitaire && l.quantite && l.dureeGarantie) &&
       fraisLivraison !== "" &&
       dateLivraison &&
       heureLivraison &&
-      livreurId &&
-      dureeGarantie
+      livreurId
   );
 
   async function enregistrer() {
@@ -217,16 +257,15 @@ export default function NouvelleCommandePage() {
         body: {
           client_id: client.id,
           adresse_id: adresse.id,
-          lignes: [
-            {
-              produit_id: Number(produitId),
-              quantite: Number(quantite),
-              prix_unitaire: Number(prixUnitaire),
-              ...(decoderDureeGarantie(dureeGarantie)?.unite === "jours"
-                ? { duree_garantie_jours: decoderDureeGarantie(dureeGarantie)?.montant }
-                : { duree_garantie_mois: decoderDureeGarantie(dureeGarantie)?.montant }),
-            },
-          ],
+          lignes: lignes.map((l) => {
+            const duree = decoderDureeGarantie(l.dureeGarantie);
+            return {
+              produit_id: Number(l.produitId),
+              quantite: Number(l.quantite),
+              prix_unitaire: Number(l.prixUnitaire),
+              ...(duree?.unite === "jours" ? { duree_garantie_jours: duree.montant } : { duree_garantie_mois: duree?.montant }),
+            };
+          }),
           frais_livraison: Number(fraisLivraison),
           date_livraison_prevue: `${dateLivraison} ${heureLivraison}:00`,
         },
@@ -247,14 +286,15 @@ export default function NouvelleCommandePage() {
 
   const livreurChoisi = livreurs?.find((l) => String(l.id) === livreurId) ?? null;
   const dateAchatFormatee = FORMATEUR_DATE_COURTE.format(new Date());
-  const dureeGarantieDecodee = dureeGarantie ? decoderDureeGarantie(dureeGarantie) : null;
-  const dateFinGarantieFormatee = dureeGarantieDecodee
-    ? FORMATEUR_DATE_COURTE.format(
-        dureeGarantieDecodee.unite === "jours"
-          ? ajouterJours(new Date(), dureeGarantieDecodee.montant)
-          : ajouterMois(new Date(), dureeGarantieDecodee.montant)
-      )
-    : null;
+
+  /** Date de fin de garantie prévisionnelle (aperçu) pour une ligne donnée. */
+  function dateFinGarantiePour(dureeGarantie: string): string | null {
+    const decodee = decoderDureeGarantie(dureeGarantie);
+    if (!decodee) return null;
+    return FORMATEUR_DATE_COURTE.format(
+      decodee.unite === "jours" ? ajouterJours(new Date(), decodee.montant) : ajouterMois(new Date(), decodee.montant)
+    );
+  }
 
   return (
     <div className="flex flex-col gap-5">
@@ -317,57 +357,109 @@ export default function NouvelleCommandePage() {
             </Champ>
           </Section>
 
-          <Section numero={2} titre="Produit et prix" icone={BagIcon}>
-            <div className="col-span-2 flex flex-col gap-1.5">
-              <label className="text-xs font-medium text-brand-muted">Produit acheté *</label>
-              {produits === null ? (
-                <p className="flex h-11 items-center text-xs text-brand-muted">Chargement des produits…</p>
-              ) : produits.length === 0 ? (
-                <p className="flex h-11 items-center text-xs text-brand-muted">Aucun ordinateur disponible à la vente pour l&apos;instant.</p>
-              ) : (
-                <SelecteurProduitAchat produits={produits} valeur={produitId} onChange={choisirProduit} />
-              )}
-              {produitDetail ? (
-                <p className="text-[11px] text-brand-muted">Vendu par {produitDetail.fournisseur?.nom_entreprise ?? "Ordi'Space (direct)"}</p>
-              ) : null}
+          <Section numero={2} titre="Produits et prix" icone={BagIcon}>
+            <div className="col-span-2 flex flex-col gap-4">
+              {lignes.map((ligne, index) => (
+                <div key={ligne.id} className="flex flex-col gap-3 rounded-xl border border-brand-line p-4">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-bold text-brand-ink">Produit {index + 1}</p>
+                    {lignes.length > 1 ? (
+                      <button
+                        type="button"
+                        onClick={() => retirerLigne(ligne.id)}
+                        aria-label="Retirer ce produit"
+                        className="flex h-7 w-7 items-center justify-center rounded-lg text-rose-500 hover:bg-rose-50"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    ) : null}
+                  </div>
+
+                  <div className="flex flex-col gap-1.5">
+                    <label className="text-xs font-medium text-brand-muted">Produit acheté *</label>
+                    {produits === null ? (
+                      <p className="flex h-11 items-center text-xs text-brand-muted">Chargement des produits…</p>
+                    ) : produits.length === 0 ? (
+                      <p className="flex h-11 items-center text-xs text-brand-muted">Aucun ordinateur disponible à la vente pour l&apos;instant.</p>
+                    ) : (
+                      <SelecteurProduitAchat produits={produits} valeur={ligne.produitId} onChange={(id) => choisirProduit(ligne.id, id)} />
+                    )}
+                    {ligne.produitDetail ? (
+                      <p className="text-[11px] text-brand-muted">
+                        Vendu par {ligne.produitDetail.fournisseur?.nom_entreprise ?? "Ordi'Space (direct)"}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-3">
+                    <Champ label="Prix d'achat unitaire">
+                      <div className="relative">
+                        <ChampTexte
+                          aria-label="Prix d'achat unitaire"
+                          type="number"
+                          min="0"
+                          value={ligne.prixUnitaire}
+                          onChange={(e) => mettreAJourLigne(ligne.id, { prixUnitaire: e.target.value })}
+                          placeholder="0"
+                          className="h-11 w-full rounded-xl border border-brand-line pl-3 pr-14 text-sm outline-none focus:border-[color:var(--brand-blue-end)]"
+                        />
+                        <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-brand-muted">FCFA</span>
+                      </div>
+                    </Champ>
+
+                    <Champ label="Quantité">
+                      <div className="flex h-11 items-center justify-between rounded-xl border border-brand-line px-2.5">
+                        <button
+                          type="button"
+                          aria-label="Diminuer la quantité"
+                          onClick={() =>
+                            mettreAJourLigne(ligne.id, { quantite: String(Math.max(1, (Number(ligne.quantite) || 1) - 1)) })
+                          }
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#EEF1F6] text-sm font-bold text-brand-ink"
+                        >
+                          −
+                        </button>
+                        <span className="text-sm font-semibold text-brand-ink">{ligne.quantite || 0}</span>
+                        <button
+                          type="button"
+                          aria-label="Augmenter la quantité"
+                          onClick={() => mettreAJourLigne(ligne.id, { quantite: String((Number(ligne.quantite) || 0) + 1) })}
+                          className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#EEF1F6] text-brand-ink"
+                        >
+                          <PlusIcon className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </Champ>
+
+                    <Champ label="Durée de garantie">
+                      <Listbox
+                        value={ligne.dureeGarantie}
+                        onChange={(v) => mettreAJourLigne(ligne.id, { dureeGarantie: v })}
+                        placeholder="Choisir une durée"
+                        options={OPTIONS_GARANTIE}
+                      />
+                    </Champ>
+                  </div>
+
+                  {ligne.prixUnitaire && ligne.quantite ? (
+                    <p className="text-right text-xs text-brand-muted">
+                      Sous-total :{" "}
+                      <span className="font-semibold text-brand-ink">
+                        {formaterPrix((Number(ligne.prixUnitaire) || 0) * (Number(ligne.quantite) || 0))} FCFA
+                      </span>
+                    </p>
+                  ) : null}
+                </div>
+              ))}
+
+              <button
+                type="button"
+                onClick={ajouterLigne}
+                className="flex h-11 items-center justify-center gap-1.5 rounded-xl border border-dashed border-brand-line text-sm font-semibold text-brand-muted hover:border-[color:var(--brand-blue-end)] hover:text-[color:var(--brand-blue-end)]"
+              >
+                <PlusIcon className="h-3.5 w-3.5" /> Ajouter un produit
+              </button>
             </div>
-
-            <Champ label="Prix d'achat unitaire">
-              <div className="relative">
-                <ChampTexte
-                  aria-label="Prix d'achat unitaire"
-                  type="number"
-                  min="0"
-                  value={prixUnitaire}
-                  onChange={(e) => setPrixUnitaire(e.target.value)}
-                  placeholder="0"
-                  className="h-11 w-full rounded-xl border border-brand-line pl-3 pr-14 text-sm outline-none focus:border-[color:var(--brand-blue-end)]"
-                />
-                <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-xs text-brand-muted">FCFA</span>
-              </div>
-            </Champ>
-
-            <Champ label="Quantité">
-              <div className="flex h-11 items-center justify-between rounded-xl border border-brand-line px-2.5">
-                <button
-                  type="button"
-                  aria-label="Diminuer la quantité"
-                  onClick={() => setQuantite((q) => String(Math.max(1, (Number(q) || 1) - 1)))}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#EEF1F6] text-sm font-bold text-brand-ink"
-                >
-                  −
-                </button>
-                <span className="text-sm font-semibold text-brand-ink">{quantite || 0}</span>
-                <button
-                  type="button"
-                  aria-label="Augmenter la quantité"
-                  onClick={() => setQuantite((q) => String((Number(q) || 0) + 1))}
-                  className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#EEF1F6] text-brand-ink"
-                >
-                  <PlusIcon className="h-3.5 w-3.5" />
-                </button>
-              </div>
-            </Champ>
 
             <Champ label="Frais de livraison">
               <div className="relative">
@@ -376,7 +468,10 @@ export default function NouvelleCommandePage() {
                   type="number"
                   min="0"
                   value={fraisLivraison}
-                  onChange={(e) => setFraisLivraison(e.target.value)}
+                  onChange={(e) => {
+                    setFraisLivraison(e.target.value);
+                    setFraisLivraisonModifieManuellement(true);
+                  }}
                   placeholder="0"
                   className="h-11 w-full rounded-xl border border-brand-line pl-3 pr-14 text-sm outline-none focus:border-[color:var(--brand-blue-end)]"
                 />
@@ -415,12 +510,9 @@ export default function NouvelleCommandePage() {
                 />
               )}
             </Champ>
-            <Champ label="Durée de garantie">
-              <Listbox value={dureeGarantie} onChange={setDureeGarantie} placeholder="Choisir une durée" options={OPTIONS_GARANTIE} />
-            </Champ>
             <p className="col-span-2 flex items-start gap-1.5 text-[11px] text-brand-muted">
               <ShieldCheckIcon className="h-3.5 w-3.5 shrink-0 translate-y-0.5" />
-              La garantie est valable à compter de la date d&apos;achat (aujourd&apos;hui), pas de la date de livraison.
+              La garantie de chaque produit est valable à compter de la date d&apos;achat (aujourd&apos;hui), pas de la date de livraison.
             </p>
           </Section>
         </div>
@@ -455,35 +547,53 @@ export default function NouvelleCommandePage() {
 
           <div className="rounded-xl bg-[#F7F8FF] p-3.5">
             <p className="flex items-center gap-1.5 text-xs font-bold text-brand-ink">
-              <BagIcon className="h-3.5 w-3.5" /> Produit et prix
+              <BagIcon className="h-3.5 w-3.5" /> Produits et prix
             </p>
-            {produitDetail ? (
-              <div className="mt-2 flex items-center gap-2.5">
-                <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white">
-                  {produitDetail.images[0] ? (
-                    // eslint-disable-next-line @next/next/no-img-element -- miniature d'aperçu, pas besoin de next/image ici
-                    <img src={produitDetail.images[0].url_image} alt="" className="h-full w-full object-cover" />
-                  ) : null}
-                </span>
-                <div className="min-w-0">
-                  <p className="truncate text-xs font-semibold text-brand-ink">{produitDetail.nom_produit}</p>
+            <div className="mt-2 flex flex-col gap-3">
+              {lignes.map((ligne, index) => (
+                <div key={ligne.id} className={index > 0 ? "border-t border-brand-line pt-2" : undefined}>
+                  {ligne.produitDetail ? (
+                    <div className="flex items-center gap-2.5">
+                      <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg bg-white">
+                        {ligne.produitDetail.images[0] ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- miniature d'aperçu, pas besoin de next/image ici
+                          <img src={ligne.produitDetail.images[0].url_image} alt="" className="h-full w-full object-cover" />
+                        ) : null}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-semibold text-brand-ink">{ligne.produitDetail.nom_produit}</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-xs text-brand-muted">Produit {index + 1} : aucun produit choisi.</p>
+                  )}
+                  <div className="mt-1 space-y-1 text-xs text-brand-muted">
+                    <p>
+                      Prix unitaire :{" "}
+                      <span className="font-semibold text-brand-ink">{ligne.prixUnitaire ? `${formaterPrix(ligne.prixUnitaire)} FCFA` : "—"}</span>
+                    </p>
+                    <p>
+                      Quantité : <span className="font-semibold text-brand-ink">{ligne.quantite || "—"}</span>
+                    </p>
+                    <p>
+                      Durée de garantie :{" "}
+                      <span className="font-semibold text-brand-ink">
+                        {OPTIONS_GARANTIE.find((o) => o.value === ligne.dureeGarantie)?.label ?? "—"}
+                      </span>
+                      {ligne.dureeGarantie && dateFinGarantiePour(ligne.dureeGarantie) ? (
+                        <span className="block text-[11px]">
+                          Du {dateAchatFormatee} au {dateFinGarantiePour(ligne.dureeGarantie)}
+                        </span>
+                      ) : null}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ) : (
-              <p className="mt-2 text-xs text-brand-muted">Aucun produit choisi.</p>
-            )}
-            <div className="mt-2 space-y-1 text-xs text-brand-muted">
-              <p>
-                Prix unitaire : <span className="font-semibold text-brand-ink">{prixUnitaire ? `${formaterPrix(prixUnitaire)} FCFA` : "—"}</span>
-              </p>
-              <p>
-                Quantité : <span className="font-semibold text-brand-ink">{quantite || "—"}</span>
-              </p>
-              <p>
-                Frais de livraison :{" "}
-                <span className="font-semibold text-brand-ink">{fraisLivraison !== "" ? `${formaterPrix(fraisLivraison)} FCFA` : "—"}</span>
-              </p>
+              ))}
             </div>
+            <p className="mt-2 text-xs text-brand-muted">
+              Frais de livraison :{" "}
+              <span className="font-semibold text-brand-ink">{fraisLivraison !== "" ? `${formaterPrix(fraisLivraison)} FCFA` : "—"}</span>
+            </p>
             <div className="mt-2 flex items-center justify-between rounded-lg bg-orange-50 px-3 py-2">
               <span className="text-xs font-bold text-orange-600">Montant total payé :</span>
               <span className="text-sm font-extrabold text-orange-600">{formaterPrix(montantTotal)} FCFA</span>
@@ -507,20 +617,6 @@ export default function NouvelleCommandePage() {
                 Livreur responsable :{" "}
                 <span className="font-semibold text-brand-ink">
                   {livreurChoisi ? (livreurChoisi.prenom ? `${livreurChoisi.prenom} ${livreurChoisi.nom}` : livreurChoisi.nom) : "—"}
-                </span>
-              </p>
-              <p className="flex items-start gap-1.5">
-                <ShieldCheckIcon className="h-3.5 w-3.5 shrink-0 translate-y-0.5" />
-                <span>
-                  Durée de garantie :{" "}
-                  <span className="font-semibold text-brand-ink">
-                    {OPTIONS_GARANTIE.find((o) => o.value === dureeGarantie)?.label ?? "—"}
-                  </span>
-                  {dureeGarantie && dateFinGarantieFormatee ? (
-                    <span className="block text-[11px] text-brand-muted">
-                      Du {dateAchatFormatee} au {dateFinGarantieFormatee}
-                    </span>
-                  ) : null}
                 </span>
               </p>
             </div>
