@@ -17,7 +17,7 @@ import {
   type StatistiquesFournisseurAdmin,
   type UtilisateurAdmin,
 } from "@/lib/types";
-import { ChevronLeftIcon, FournisseursIcon, MailIcon, PencilIcon, PhoneIcon } from "@/components/icons";
+import { ChevronLeftIcon, FournisseursIcon, MailIcon, PencilIcon, PhoneIcon, TrashIcon } from "@/components/icons";
 import { PageHero } from "@/components/PageHero";
 
 const CHAMP = "h-10 rounded-xl border border-brand-line px-3 text-sm";
@@ -137,6 +137,19 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
     }
   }
 
+  async function supprimer() {
+    if (!token) return;
+    if (!confirm("Supprimer ce compte fournisseur ? Cette action est irréversible — il ne pourra plus jamais se connecter.")) return;
+
+    setEnCours(true);
+    try {
+      await apiFetch(`/admin/utilisateurs/${fournisseurId}/statut`, { method: "PATCH", token, body: { statut_compte: "supprime" } });
+      charger();
+    } finally {
+      setEnCours(false);
+    }
+  }
+
   useEffect(() => {
     if (!token || onglet !== "commandes" || commandes !== null || erreurCommandes) return;
     apiFetch<{ commandes: Pagination<CommandeFournisseur> }>(`/fournisseurs/${fournisseurId}/commandes?per_page=50`, { token })
@@ -219,26 +232,39 @@ export function FicheFournisseur({ fournisseurId }: { fournisseurId: number }) {
               </span>
             </div>
             <div className="flex gap-2">
-              {!edition ? (
-                <button
-                  type="button"
-                  onClick={() => setEdition(true)}
-                  className="flex h-9 items-center gap-1.5 rounded-full border border-brand-line px-3.5 text-xs font-semibold text-brand-ink"
-                >
-                  <PencilIcon className="h-3.5 w-3.5" />
-                  Modifier
-                </button>
+              {utilisateur.statut_compte !== "supprime" ? (
+                <>
+                  {!edition ? (
+                    <button
+                      type="button"
+                      onClick={() => setEdition(true)}
+                      className="flex h-9 items-center gap-1.5 rounded-full border border-brand-line px-3.5 text-xs font-semibold text-brand-ink"
+                    >
+                      <PencilIcon className="h-3.5 w-3.5" />
+                      Modifier
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
+                    onClick={basculerStatut}
+                    disabled={enCours}
+                    className={`h-9 rounded-full px-3.5 text-xs font-semibold disabled:opacity-50 ${
+                      utilisateur.statut_compte === "actif" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
+                    }`}
+                  >
+                    {utilisateur.statut_compte === "actif" ? "Désactiver" : "Réactiver"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={supprimer}
+                    disabled={enCours}
+                    className="flex h-9 items-center gap-1.5 rounded-full bg-rose-600 px-3.5 text-xs font-semibold text-white disabled:opacity-50"
+                  >
+                    <TrashIcon className="h-3.5 w-3.5" />
+                    Supprimer
+                  </button>
+                </>
               ) : null}
-              <button
-                type="button"
-                onClick={basculerStatut}
-                disabled={enCours}
-                className={`h-9 rounded-full px-3.5 text-xs font-semibold disabled:opacity-50 ${
-                  utilisateur.statut_compte === "actif" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
-                }`}
-              >
-                {utilisateur.statut_compte === "actif" ? "Désactiver" : "Réactiver"}
-              </button>
             </div>
           </div>
 

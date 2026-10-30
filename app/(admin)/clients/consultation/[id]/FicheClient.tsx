@@ -49,6 +49,7 @@ import {
   SettingsIcon,
   ShieldCheckIcon,
   TicketIcon,
+  TrashIcon,
   UserAvatarIcon,
   WhatsAppIcon,
   XIcon,
@@ -605,7 +606,7 @@ export function FicheClient({ id }: { id: string }) {
           {onglet === "Privilèges" ? <OngletPrivileges fiche={fiche} /> : null}
           {onglet === "Garanties" ? <OngletGaranties fiche={fiche} token={token} onRafraichir={rechargerFiche} /> : null}
           {onglet === "Formation" ? <OngletFormation fiche={fiche} /> : null}
-          {onglet === "Profil" ? <OngletProfil fiche={fiche} /> : null}
+          {onglet === "Profil" ? <OngletProfil fiche={fiche} clientId={id} token={token} onRafraichir={rechargerFiche} /> : null}
         </div>
       </div>
 
@@ -1161,17 +1162,81 @@ function ChampProfil({
   );
 }
 
-function OngletProfil({ fiche }: { fiche: FicheClientType }) {
+function OngletProfil({
+  fiche,
+  clientId,
+  token,
+  onRafraichir,
+}: {
+  fiche: FicheClientType;
+  clientId: string;
+  token: string | null;
+  onRafraichir: () => void;
+}) {
   const { profil } = fiche;
+  const [enCours, setEnCours] = useState(false);
+  const statut = profil.user.statut_compte;
+
+  async function basculerStatut() {
+    if (!token) return;
+    const nouveauStatut = statut === "actif" ? "desactive" : "actif";
+    if (nouveauStatut === "desactive" && !confirm("Désactiver ce compte client ? Il ne pourra plus se connecter.")) return;
+
+    setEnCours(true);
+    try {
+      await apiFetch(`/admin/utilisateurs/${clientId}/statut`, { method: "PATCH", token, body: { statut_compte: nouveauStatut } });
+      onRafraichir();
+    } finally {
+      setEnCours(false);
+    }
+  }
+
+  async function supprimer() {
+    if (!token) return;
+    if (!confirm("Supprimer ce compte client ? Cette action est irréversible — il ne pourra plus jamais se connecter.")) return;
+
+    setEnCours(true);
+    try {
+      await apiFetch(`/admin/utilisateurs/${clientId}/statut`, { method: "PATCH", token, body: { statut_compte: "supprime" } });
+      onRafraichir();
+    } finally {
+      setEnCours(false);
+    }
+  }
 
   return (
     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
       <div className="flex flex-col gap-3">
         <div className="flex items-center justify-between">
           <p className="text-xs font-bold uppercase text-brand-muted">Informations personnelles</p>
-          <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${STYLE_STATUT_COMPTE[profil.user.statut_compte]}`}>
-            {LIBELLE_STATUT_COMPTE[profil.user.statut_compte]}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${STYLE_STATUT_COMPTE[statut]}`}>
+              {LIBELLE_STATUT_COMPTE[statut]}
+            </span>
+            {statut !== "supprime" ? (
+              <>
+                <button
+                  type="button"
+                  onClick={basculerStatut}
+                  disabled={enCours}
+                  className={`rounded-full px-3 py-1 text-[11px] font-semibold disabled:opacity-50 ${
+                    statut === "actif" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
+                  }`}
+                >
+                  {statut === "actif" ? "Désactiver" : "Réactiver"}
+                </button>
+                <button
+                  type="button"
+                  onClick={supprimer}
+                  disabled={enCours}
+                  className="flex items-center gap-1 rounded-full bg-rose-600 px-3 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+                >
+                  <TrashIcon className="h-3 w-3" />
+                  Supprimer
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
         <ChampProfil
           label="Nom complet"

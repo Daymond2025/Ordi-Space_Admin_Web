@@ -8,7 +8,7 @@ import { formaterDate, LIBELLE_STATUT_COMPTE, STYLE_STATUT_COMPTE, type Administ
 import { NAV_ITEMS } from "@/lib/nav";
 import { ModaleAdministrateur } from "@/components/ModaleAdministrateur";
 import { PageHero } from "@/components/PageHero";
-import { PencilIcon, PlusIcon, SettingsIcon, ShieldCheckIcon, UserAvatarIcon, UserPlusIcon } from "@/components/icons";
+import { PencilIcon, PlusIcon, SettingsIcon, ShieldCheckIcon, TrashIcon, UserAvatarIcon, UserPlusIcon } from "@/components/icons";
 
 const ONGLETS = [
   { id: "compte", label: "Mon compte" },
@@ -120,6 +120,19 @@ function OngletAdministrateurs() {
     }
   }
 
+  async function supprimer(admin: AdministrateurAdmin) {
+    if (!token) return;
+    if (!confirm(`Supprimer le compte de ${admin.prenom ?? ""} ${admin.nom} ? Cette action est irréversible — il ne pourra plus jamais se connecter.`)) return;
+
+    setEnCours(admin.id);
+    try {
+      await apiFetch(`/admin/utilisateurs/${admin.id}/statut`, { method: "PATCH", token, body: { statut_compte: "supprime" } });
+      recharger();
+    } finally {
+      setEnCours(null);
+    }
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex items-center justify-between">
@@ -196,28 +209,41 @@ function OngletAdministrateurs() {
                 </div>
 
                 <div className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAdminEdite(admin);
-                      setModaleOuverte(true);
-                    }}
-                    className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EEF1F6] text-brand-ink"
-                    aria-label="Modifier"
-                  >
-                    <PencilIcon className="h-4 w-4" />
-                  </button>
-                  {!soiMeme ? (
+                  {admin.statut_compte !== "supprime" ? (
                     <button
                       type="button"
-                      onClick={() => basculerStatut(admin)}
-                      disabled={enCours === admin.id}
-                      className={`rounded-full px-3 py-2 text-xs font-semibold disabled:opacity-50 ${
-                        admin.statut_compte === "actif" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
-                      }`}
+                      onClick={() => {
+                        setAdminEdite(admin);
+                        setModaleOuverte(true);
+                      }}
+                      className="flex h-9 w-9 items-center justify-center rounded-full bg-[#EEF1F6] text-brand-ink"
+                      aria-label="Modifier"
                     >
-                      {admin.statut_compte === "actif" ? "Désactiver" : "Réactiver"}
+                      <PencilIcon className="h-4 w-4" />
                     </button>
+                  ) : null}
+                  {!soiMeme && admin.statut_compte !== "supprime" ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => basculerStatut(admin)}
+                        disabled={enCours === admin.id}
+                        className={`rounded-full px-3 py-2 text-xs font-semibold disabled:opacity-50 ${
+                          admin.statut_compte === "actif" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
+                        }`}
+                      >
+                        {admin.statut_compte === "actif" ? "Désactiver" : "Réactiver"}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => supprimer(admin)}
+                        disabled={enCours === admin.id}
+                        className="flex h-9 w-9 items-center justify-center rounded-full bg-rose-600 text-white disabled:opacity-50"
+                        aria-label="Supprimer"
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </button>
+                    </>
                   ) : null}
                 </div>
               </div>

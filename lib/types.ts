@@ -203,18 +203,20 @@ export const LIBELLE_TYPE_PRIVILEGE: Record<TypePrivilege, string> = {
 
 // --- Utilisateurs (admin/utilisateurs) -----------------------------------
 
-export type StatutCompte = "actif" | "suspendu" | "desactive";
+export type StatutCompte = "actif" | "suspendu" | "desactive" | "supprime";
 
 export const LIBELLE_STATUT_COMPTE: Record<StatutCompte, string> = {
   actif: "Actif",
   suspendu: "Suspendu",
   desactive: "Désactivé",
+  supprime: "Supprimé",
 };
 
 export const STYLE_STATUT_COMPTE: Record<StatutCompte, string> = {
   actif: "bg-emerald-100 text-emerald-600",
   suspendu: "bg-amber-100 text-amber-600",
   desactive: "bg-rose-100 text-rose-600",
+  supprime: "bg-slate-200 text-slate-600",
 };
 
 export type UtilisateurAdmin = {

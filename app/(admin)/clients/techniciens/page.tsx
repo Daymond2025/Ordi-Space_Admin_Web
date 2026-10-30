@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { LIBELLE_STATUT_COMPTE, STYLE_STATUT_COMPTE, type TechnicienAdmin } from "@/lib/types";
-import { MaintenanceServiceIcon, PlusIcon, SearchIcon, UserAvatarIcon } from "@/components/icons";
+import { MaintenanceServiceIcon, PlusIcon, SearchIcon, TrashIcon, UserAvatarIcon } from "@/components/icons";
 import { PageHero } from "@/components/PageHero";
 import { ModaleProvisionnerUtilisateur } from "@/components/ModaleProvisionnerUtilisateur";
 
@@ -21,6 +21,7 @@ export default function TechniciensListePage() {
   const [recherche, setRecherche] = useState("");
   const [modaleOuverte, setModaleOuverte] = useState(false);
   const [erreur, setErreur] = useState(false);
+  const [enCours, setEnCours] = useState<number | null>(null);
 
   const charger = useCallback(() => {
     if (!token) return;
@@ -42,6 +43,33 @@ export default function TechniciensListePage() {
   }, [techniciens, recherche]);
 
   const actifs = techniciens?.filter((t) => t.statut_compte === "actif").length ?? 0;
+
+  async function basculerStatut(t: TechnicienAdmin) {
+    if (!token) return;
+    const nouveauStatut = t.statut_compte === "actif" ? "desactive" : "actif";
+    if (nouveauStatut === "desactive" && !confirm("Désactiver ce compte technicien ? Il ne pourra plus se connecter.")) return;
+
+    setEnCours(t.user_id);
+    try {
+      await apiFetch(`/admin/utilisateurs/${t.user_id}/statut`, { method: "PATCH", token, body: { statut_compte: nouveauStatut } });
+      charger();
+    } finally {
+      setEnCours(null);
+    }
+  }
+
+  async function supprimer(t: TechnicienAdmin) {
+    if (!token) return;
+    if (!confirm("Supprimer ce compte technicien ? Cette action est irréversible — il ne pourra plus jamais se connecter.")) return;
+
+    setEnCours(t.user_id);
+    try {
+      await apiFetch(`/admin/utilisateurs/${t.user_id}/statut`, { method: "PATCH", token, body: { statut_compte: "supprime" } });
+      charger();
+    } finally {
+      setEnCours(null);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -118,6 +146,29 @@ export default function TechniciensListePage() {
                 <p className="mt-0.5 truncate text-xs text-brand-muted">{t.telephone ?? "—"}</p>
               </div>
               <p className="shrink-0 text-xs text-brand-muted">{t.specialite ?? "Spécialité non renseignée"}</p>
+              {t.statut_compte !== "supprime" ? (
+                <div className="flex shrink-0 items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => basculerStatut(t)}
+                    disabled={enCours === t.user_id}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold disabled:opacity-50 ${
+                      t.statut_compte === "actif" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
+                    }`}
+                  >
+                    {t.statut_compte === "actif" ? "Désactiver" : "Réactiver"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => supprimer(t)}
+                    disabled={enCours === t.user_id}
+                    className="flex h-8 w-8 items-center justify-center rounded-full bg-rose-600 text-white disabled:opacity-50"
+                    aria-label="Supprimer"
+                  >
+                    <TrashIcon className="h-3.5 w-3.5" />
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
