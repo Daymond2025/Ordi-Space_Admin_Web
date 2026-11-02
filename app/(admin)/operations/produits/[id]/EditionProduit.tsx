@@ -254,25 +254,23 @@ export function EditionProduit({ id }: { id: string }) {
 
       <form onSubmit={enregistrer} className="flex max-w-2xl flex-col gap-4 rounded-2xl border border-brand-line bg-white p-6">
         {!estAdminProduit ? (
-          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
-            Produit d&apos;un fournisseur — seule la validation/le rejet est disponible ici, pas la modification de la fiche.
+          <p className="rounded-lg bg-blue-50 px-3 py-2 text-xs text-blue-700">
+            Produit du fournisseur {produit.fournisseur?.nom_entreprise} — modifiable par l&apos;administrateur, les changements s&apos;appliquent immédiatement.
           </p>
         ) : null}
 
-        <fieldset disabled={!estAdminProduit} className="flex flex-col gap-4 disabled:opacity-60">
+        <fieldset className="flex flex-col gap-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-brand-muted">Catégorie</label>
               <Listbox value={categorieId} onChange={setCategorieId} options={categories.map((c) => ({ value: String(c.id), label: c.nom_categorie }))} />
-              {estAdminProduit ? (
-                <AjoutCategorieRapide
-                  token={token}
-                  onCreee={(categorie) => {
-                    setCategories((liste) => [...liste, categorie]);
-                    setCategorieId(String(categorie.id));
-                  }}
-                />
-              ) : null}
+              <AjoutCategorieRapide
+                token={token}
+                onCreee={(categorie) => {
+                  setCategories((liste) => [...liste, categorie]);
+                  setCategorieId(String(categorie.id));
+                }}
+              />
             </div>
             <div className="flex flex-col gap-1.5">
               <label className="text-xs font-medium text-brand-muted">Type de livraison</label>
