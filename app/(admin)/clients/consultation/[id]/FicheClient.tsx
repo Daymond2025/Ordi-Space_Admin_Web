@@ -107,8 +107,9 @@ function StatCarte({ label, valeur, icone: Icone, couleur }: { label: string; va
   );
 }
 
+/** Chiffres seuls pour wa.me — 225 + 9 chiffres = 0 initial perdu (numéro ivoirien à 10 chiffres), on le rétablit. */
 function normaliserTelephone(telephone: string): string {
-  return telephone.replace(/[^\d]/g, "");
+  return telephone.replace(/[^\d]/g, "").replace(/^225(\d{9})$/, "2250$1");
 }
 
 /**
