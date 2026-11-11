@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiRequestError } from "@/lib/api";
@@ -1175,6 +1175,7 @@ function OngletProfil({
   onRafraichir: () => void;
 }) {
   const { profil } = fiche;
+  const router = useRouter();
   const [enCours, setEnCours] = useState(false);
   const statut = profil.user.statut_compte;
 
@@ -1192,15 +1193,27 @@ function OngletProfil({
     }
   }
 
+  /**
+   * Suppression DÉFINITIVE (DELETE /admin/clients/{id}) : compte, accès et
+   * toutes ses données (commandes, SAV, réclamations, garanties…). Avant, le
+   * bouton ne faisait que passer le statut à "supprimé" et le client restait
+   * dans la liste.
+   */
   async function supprimer() {
     if (!token) return;
-    if (!confirm("Supprimer ce compte client ? Cette action est irréversible — il ne pourra plus jamais se connecter.")) return;
+    if (
+      !confirm(
+        "Supprimer définitivement ce client ?\n\nSon compte, ses accès et toutes ses données (commandes, SAV, réclamations, garanties…) seront effacés. Cette action est irréversible."
+      )
+    )
+      return;
 
     setEnCours(true);
     try {
-      await apiFetch(`/admin/utilisateurs/${clientId}/statut`, { method: "PATCH", token, body: { statut_compte: "supprime" } });
-      onRafraichir();
-    } finally {
+      await apiFetch(`/admin/clients/${clientId}`, { method: "DELETE", token });
+      router.replace("/clients/liste");
+    } catch (e) {
+      alert(e instanceof ApiRequestError ? e.message : "Impossible de supprimer ce client, réessaie.");
       setEnCours(false);
     }
   }
@@ -1215,28 +1228,27 @@ function OngletProfil({
               {LIBELLE_STATUT_COMPTE[statut]}
             </span>
             {statut !== "supprime" ? (
-              <>
-                <button
-                  type="button"
-                  onClick={basculerStatut}
-                  disabled={enCours}
-                  className={`rounded-full px-3 py-1 text-[11px] font-semibold disabled:opacity-50 ${
-                    statut === "actif" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
-                  }`}
-                >
-                  {statut === "actif" ? "Désactiver" : "Réactiver"}
-                </button>
-                <button
-                  type="button"
-                  onClick={supprimer}
-                  disabled={enCours}
-                  className="flex items-center gap-1 rounded-full bg-rose-600 px-3 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
-                >
-                  <TrashIcon className="h-3 w-3" />
-                  Supprimer
-                </button>
-              </>
+              <button
+                type="button"
+                onClick={basculerStatut}
+                disabled={enCours}
+                className={`rounded-full px-3 py-1 text-[11px] font-semibold disabled:opacity-50 ${
+                  statut === "actif" ? "bg-rose-50 text-rose-600" : "bg-emerald-50 text-emerald-600"
+                }`}
+              >
+                {statut === "actif" ? "Désactiver" : "Réactiver"}
+              </button>
             ) : null}
+            {/* Aussi pour les comptes marqués "supprimé" par l'ancien bouton, restés dans la liste. */}
+            <button
+              type="button"
+              onClick={supprimer}
+              disabled={enCours}
+              className="flex items-center gap-1 rounded-full bg-rose-600 px-3 py-1 text-[11px] font-semibold text-white disabled:opacity-50"
+            >
+              <TrashIcon className="h-3 w-3" />
+              Supprimer
+            </button>
           </div>
         </div>
         <ChampProfil

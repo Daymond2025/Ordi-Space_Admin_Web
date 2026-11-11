@@ -238,25 +238,20 @@ export default function NouvelleCommandePage() {
     setErreur(null);
     setEnCours(true);
 
+    // Une seule opération côté serveur (client + adresse + commande + livreur) :
+    // si la commande est refusée, rien n'est enregistré — avant, le client
+    // restait créé malgré le message d'erreur.
     try {
-      const client = await apiFetch<{ id: number }>("/clients/creation-rapide", {
-        method: "POST",
-        token,
-        body: { nom, prenom, telephone },
-      });
-
-      const adresse = await apiFetch<{ id: number }>(`/clients/${client.id}/adresses`, {
-        method: "POST",
-        token,
-        body: { localite_id: Number(localiteId) },
-      });
-
-      const commande = await apiFetch<{ id: number }>("/commandes", {
+      const resultat = await apiFetch<{ client_id: number; commande_id: number }>("/admin/clients/nouvelle-commande", {
         method: "POST",
         token,
         body: {
-          client_id: client.id,
-          adresse_id: adresse.id,
+          nom,
+          prenom,
+          telephone,
+          localite_id: Number(localiteId),
+          livreur_id: Number(livreurId),
+          commande: {
           lignes: lignes.map((l) => {
             const duree = decoderDureeGarantie(l.dureeGarantie);
             return {
@@ -268,18 +263,16 @@ export default function NouvelleCommandePage() {
           }),
           frais_livraison: Number(fraisLivraison),
           date_livraison_prevue: `${dateLivraison} ${heureLivraison}:00`,
+          },
         },
       });
 
-      await apiFetch(`/commandes/${commande.id}/assigner-livreur`, {
-        method: "POST",
-        token,
-        body: { livreur_id: Number(livreurId) },
-      });
-
-      router.push(`/clients/consultation/${client.id}?commande_creee=${commande.id}`);
+      router.push(`/clients/consultation/${resultat.client_id}?commande_creee=${resultat.commande_id}`);
     } catch (e) {
-      setErreur(e instanceof ApiRequestError ? e.message : "Impossible d'enregistrer cette commande.");
+      // La raison précise (ex. "Stock insuffisant pour « … »") plutôt que le
+      // seul "Les données envoyées ne sont pas valides".
+      const detail = e instanceof ApiRequestError && e.fields ? Object.values(e.fields).flat()[0] : undefined;
+      setErreur(detail ?? (e instanceof ApiRequestError ? e.message : "Impossible d'enregistrer cette commande."));
       setEnCours(false);
     }
   }
