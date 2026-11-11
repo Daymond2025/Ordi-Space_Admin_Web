@@ -1,36 +1,77 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# OrdiSpace — Administration
 
-## Getting Started
+Back-office web (Next.js) des administrateurs OrdiSpace : pilotage de tous les espaces de la plateforme — opérations et catalogue, commandes, clients, commerciaux, fournisseurs, livreurs, maintenance, coordinateurs, finance et rapports.
 
-First, run the development server:
+Elle consomme l'API du dépôt [`Ordi-Space_backend`](https://github.com/Daymond2025/Ordi-Space_backend) (Laravel) via des jetons Bearer (Sanctum).
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+## Stack technique
+
+- [Next.js 16](https://nextjs.org) (App Router, Turbopack) + React 19 + TypeScript
+- Tailwind CSS 4
+- Authentification : e-mail + mot de passe, puis code de double authentification reçu par e-mail
+- Contexte React pour la session (`context/`), client HTTP unique (`lib/api.ts`)
+
+## Fonctionnalités principales
+
+- **Dashboard** et **Reports** — indicateurs généraux de la plateforme.
+- **Opérations** — catalogue (produits, catégories, création/modification), discussions produit, négociation de prix.
+- **Commandes** — commandes et paiements de confirmation.
+- **Clients** — liste, fiche client (activités, commandes, garanties, profil, lien WhatsApp d'invitation), création d'un client avec sa commande, **suppression définitive**, privilèges et fidélité, GarantiX, maintenance et déclarations de panne, techniciens, réclamations, assistance (FAQ) et contenus (tutoriels).
+- **Commerciaux, fournisseurs, livreurs, coordinateurs** — fiches, listes, retraits et réponses rapides.
+- **Finance** — validation des retraits.
+- **Settings** — compte, administrateurs et espaces autorisés.
+
+Un administrateur peut être « restreint » à certains espaces : le backend vérifie chaque accès (middleware `espace:…`), l'interface masque les entrées non autorisées (`lib/nav.ts`).
+
+## Structure du projet
+
+```text
+app/
+├── login/                 # Connexion + double authentification, mot de passe oublié
+└── (admin)/               # Pages avec la navigation de l'administration
+    ├── operations/        # Catalogue, catégories, discussions produit
+    ├── commandes/
+    ├── clients/           # Liste, fiche (consultation/[id]), nouveau, SAV, privilèges, contenus…
+    ├── commerciaux/, fournisseurs/, livreurs/, coordinateurs/
+    ├── maintenance/, finance/, reports/, settings/
+components/                # Coquille (sidebars, topbar), modales, discussion, icônes
+context/                   # AuthContext (session, rôle, espaces)
+lib/
+├── api.ts                 # Client HTTP (fetch + erreurs API normalisées)
+├── nav.ts                 # Navigation par espace
+└── types.ts               # Types partagés
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## Démarrage
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Prérequis : Node.js 20+, et l'API backend lancée (localement ou en pointant vers la prod).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+```bash
+npm install
+cp .env.example .env.local   # renseigner les variables ci-dessous
+npm run dev                  # http://localhost:3000
+```
 
-## Learn More
+Pour lancer plusieurs applications OrdiSpace en même temps, choisir un autre port (`npm run dev -- -p 3001`) et l'ajouter à `CORS_ALLOWED_ORIGINS` dans le `.env` du backend.
 
-To learn more about Next.js, take a look at the following resources:
+### Variables d'environnement
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Variable | Description |
+| --- | --- |
+| `NEXT_PUBLIC_API_URL` | URL de base de l'API (ex. `http://127.0.0.1:8000/api/v1` en local, `https://ordisapce.daymondboutique.com/api/v1` en production) |
+| `NEXT_PUBLIC_CLIENT_APP_URL` | URL de l'application Client, utilisée pour le lien d'invitation envoyé par WhatsApp depuis la fiche client |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Aucune clé secrète ne doit se trouver dans cette app : c'est un client public, tout appel sensible passe par l'API.
 
-## Deploy on Vercel
+## Scripts
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+| Commande | Description |
+| --- | --- |
+| `npm run dev` | Serveur de développement (Turbopack) |
+| `npm run build` | Build de production |
+| `npm run start` | Sert le build de production |
+| `npm run lint` | ESLint |
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## Déploiement
+
+Production : `ordispace.admin.daymondboutique.com`. Configurer `NEXT_PUBLIC_API_URL` et `NEXT_PUBLIC_CLIENT_APP_URL` sur l'hébergeur, et garder le domaine dans `CORS_ALLOWED_ORIGINS` côté backend. Tout nouveau domaine d'API doit être ajouté à `images.remotePatterns` dans `next.config.ts` (images produits servies depuis `/storage`).
