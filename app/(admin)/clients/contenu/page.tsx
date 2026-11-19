@@ -15,6 +15,7 @@ const ONGLETS: { id: TypeTutoriel | "tous"; label: string }[] = [
   { id: "formation", label: "Formations" },
 ];
 
+/** Academy Space des clients — les formations de vente (commerciaux) ont leur propre page, /commerciaux/formations. */
 export default function ContenuPage() {
   const { token } = useAuth();
   const [contenus, setContenus] = useState<Tutoriel[] | null>(null);
@@ -25,7 +26,7 @@ export default function ContenuPage() {
     if (!token) return;
     apiFetch<Pagination<Tutoriel>>("/tutoriels?per_page=100", { token })
       .then((page) => {
-        setContenus(page.data);
+        setContenus(page.data.filter((c) => c.type !== "formation_vente"));
         setErreur(false);
       })
       .catch(() => setErreur(true));

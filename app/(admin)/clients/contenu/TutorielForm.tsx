@@ -20,12 +20,17 @@ const OPTIONS_STATUT = [
   { value: "publie", label: "Publié" },
 ];
 
-export function TutorielForm({ existant }: { existant?: Tutoriel }) {
+/** Page de retour après enregistrement : les formations de vente vivent dans l'espace Commerciaux. */
+function pageListe(type: TypeTutoriel): string {
+  return type === "formation_vente" ? "/commerciaux/formations" : "/clients/contenu";
+}
+
+export function TutorielForm({ existant, typeParDefaut }: { existant?: Tutoriel; typeParDefaut?: TypeTutoriel }) {
   const router = useRouter();
   const { token } = useAuth();
 
   const [titre, setTitre] = useState(existant?.titre ?? "");
-  const [type, setType] = useState<TypeTutoriel>(existant?.type ?? "tutoriel_rapide");
+  const [type, setType] = useState<TypeTutoriel>(existant?.type ?? typeParDefaut ?? "tutoriel_rapide");
   const [statut, setStatut] = useState<StatutTutoriel>(existant?.statut ?? "brouillon");
   const [urlVideo, setUrlVideo] = useState(existant?.url_video ?? "");
   const [contenu, setContenu] = useState(existant?.contenu ?? "");
@@ -55,7 +60,7 @@ export function TutorielForm({ existant }: { existant?: Tutoriel }) {
       } else {
         await apiFetch("/tutoriels", { method: "POST", token, body: donnees });
       }
-      router.push("/clients/contenu");
+      router.push(pageListe(type));
     } catch (e) {
       setErreur(e instanceof ApiRequestError ? e.message : "Impossible d'enregistrer ce contenu.");
     } finally {
@@ -72,7 +77,7 @@ export function TutorielForm({ existant }: { existant?: Tutoriel }) {
 
     try {
       await apiFetch(`/tutoriels/${existant.id}`, { method: "DELETE", token });
-      router.push("/clients/contenu");
+      router.push(pageListe(type));
     } catch (e) {
       setErreur(e instanceof ApiRequestError ? e.message : "Impossible de supprimer ce contenu.");
       setSuppression(false);

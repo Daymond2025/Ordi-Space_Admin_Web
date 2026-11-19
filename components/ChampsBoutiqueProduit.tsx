@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { formaterPrix, type Produit } from "@/lib/types";
+import { COMMISSION_COMMERCIAL_INDEPENDANT_DEFAUT, formaterPrix, type Produit } from "@/lib/types";
 import { Listbox } from "@/components/Listbox";
 import { BaremeLivraison } from "@/components/BaremeLivraison";
 
@@ -25,6 +25,8 @@ export type ChampsBoutique = {
   prixBarre: string;
   reduction: string;
   commissionApporteur: string;
+  /** Commission d'un commercial indépendant par produit vendu — vide = montant par défaut. */
+  commissionCommercialIndependant: string;
   /** id de localité → frais saisis ; vide = localité non livrée. */
   frais: Record<number, string>;
   /** Incitation marketing (liste prédéfinie côté mobile, ici texte libre — même effet). */
@@ -47,6 +49,7 @@ export const CHAMPS_BOUTIQUE_VIDES: ChampsBoutique = {
   prixBarre: "",
   reduction: "",
   commissionApporteur: "",
+  commissionCommercialIndependant: "",
   frais: {},
   cadeaux: [],
   contenuPack: [],
@@ -103,6 +106,7 @@ export function champsDepuisProduit(p: Produit): ChampsBoutique {
     prixBarre: entier(p.prix_barre),
     reduction: p.pourcentage_reduction === null ? "" : String(p.pourcentage_reduction),
     commissionApporteur: entier(p.commission_apporteur),
+    commissionCommercialIndependant: entier(p.commission_commercial_independant),
     frais: Object.fromEntries((p.frais_livraison ?? []).filter((f) => f.localite).map((f) => [f.localite!.id, entier(f.montant)])),
     cadeaux: p.cadeaux ?? [],
     contenuPack: p.contenu_pack ?? [],
@@ -132,6 +136,7 @@ export function champsVersCorps(c: ChampsBoutique): Record<string, unknown> {
     prix_barre: nombre(c.prixBarre),
     pourcentage_reduction: nombre(c.reduction),
     commission_apporteur: nombre(c.commissionApporteur),
+    commission_commercial_independant: nombre(c.commissionCommercialIndependant),
     cadeaux: c.cadeaux,
     contenu_pack: c.contenuPack,
     // Remplacement complet du barème ; omis, il reste tel quel (voir ProduitController::update()).
@@ -343,7 +348,21 @@ export function SectionVente({
           <div className={`${CHAMP} flex items-center bg-[#F5F7FA] text-brand-muted`}>{valeurs.reduction || "0"}%</div>
         </Champ>
         <ChampTexte libelle="Commission apporteur d'affaire" suffixe="CFA" type="number" valeur={valeurs.commissionApporteur} onChange={(v) => maj({ commissionApporteur: v })} />
+        <Champ libelle="Commission commercial indépendant (CFA, par produit vendu)">
+          <input
+            type="number"
+            min={0}
+            value={valeurs.commissionCommercialIndependant}
+            onChange={(e) => maj({ commissionCommercialIndependant: e.target.value })}
+            placeholder={`${formaterPrix(COMMISSION_COMMERCIAL_INDEPENDANT_DEFAUT)} par défaut`}
+            className={CHAMP}
+          />
+        </Champ>
       </div>
+
+      <p className="-mt-2 text-xs text-brand-muted">
+        Vide = {formaterPrix(COMMISSION_COMMERCIAL_INDEPENDANT_DEFAUT)} CFA. Les commerciaux internes touchent toujours 1 000 CFA par produit vendu.
+      </p>
 
       {commissionOrdispace !== null && commissionOrdispace !== undefined ? (
         <div className="flex items-center justify-between rounded-xl bg-blue-50 px-4 py-3">

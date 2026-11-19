@@ -79,6 +79,8 @@ export type Produit = {
   couleur: string | null;
   prix_vente: string | null;
   commission_apporteur: string | null;
+  /** Commission d'un commercial indépendant par produit vendu — null = montant par défaut (2 500 F). */
+  commission_commercial_independant: string | null;
   prix_barre: string | null;
   pourcentage_reduction: number | null;
   frais_livraison?: { montant: string; localite: { id: number; nom: string } | null }[];
@@ -132,7 +134,8 @@ export type ExclusionGarantix = {
 
 // --- Tutoriels / Formations ----------------------------------------------
 
-export type TypeTutoriel = "tutoriel_rapide" | "formation";
+/** formation_vente : formation spécifique de vente, visible des seuls commerciaux (app Commercial). */
+export type TypeTutoriel = "tutoriel_rapide" | "formation" | "formation_vente";
 export type StatutTutoriel = "brouillon" | "publie";
 
 export type Tutoriel = {
@@ -150,6 +153,7 @@ export type Tutoriel = {
 export const LIBELLE_TYPE_TUTORIEL: Record<TypeTutoriel, string> = {
   tutoriel_rapide: "Tuto rapide",
   formation: "Formation",
+  formation_vente: "Formation de vente (commerciaux)",
 };
 
 // Aperçu client-side pendant la saisie (avant enregistrement, donc avant que
@@ -926,10 +930,22 @@ export type MissionLivreurAdmin = {
 
 // --- Espace Coordinateur — Commerciaux (miroir GET /coordinateur/commerciaux*) ----------
 
+/** Fixé par l'Admin à la création : interne (salarié, 1 000 F par produit vendu) ou indépendant (recruté). */
+export type CategorieCommercial = "interne" | "independant";
+
+export const LIBELLE_CATEGORIE_COMMERCIAL: Record<CategorieCommercial, string> = {
+  interne: "Commercial interne",
+  independant: "Commercial indépendant",
+};
+
+export const COMMISSION_COMMERCIAL_INTERNE = 1000;
+export const COMMISSION_COMMERCIAL_INDEPENDANT_DEFAUT = 2500;
+
 export type CommercialAdmin = {
   user_id: number;
   nom: string;
   prenom: string | null;
+  categorie_commercial: CategorieCommercial;
   actif: boolean;
   membre_depuis: string;
   commandes_total: number;
@@ -946,6 +962,7 @@ export type CommercialDetailAdmin = {
   actif: boolean;
   nom_entreprise: string | null;
   localisation: string | null;
+  categorie_commercial: CategorieCommercial;
   statistiques: { commandes_total: number; commandes_validees: number; commandes_annulees: number; commission_totale: number };
 };
 

@@ -159,7 +159,11 @@ export const SECTIONS_SECONDAIRES: Record<string, SectionSecondaire> = {
       },
       {
         label: "Outils",
-        elements: [{ label: "Réponses rapides", href: "/commerciaux/reponses-rapides" }],
+        elements: [
+          { label: "Réponses rapides", href: "/commerciaux/reponses-rapides" },
+          { label: "Formations de vente", href: "/commerciaux/formations" },
+          { label: "Contact du service", href: "/commerciaux/contact" },
+        ],
       },
     ],
   },

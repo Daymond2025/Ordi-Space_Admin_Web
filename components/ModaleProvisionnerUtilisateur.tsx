@@ -4,6 +4,13 @@ import { useRef, useState } from "react";
 import { ApiRequestError, apiFetch } from "@/lib/api";
 import { Listbox } from "@/components/Listbox";
 import { UserAvatarIcon, XIcon } from "@/components/icons";
+import {
+  COMMISSION_COMMERCIAL_INDEPENDANT_DEFAUT,
+  COMMISSION_COMMERCIAL_INTERNE,
+  formaterPrix,
+  LIBELLE_CATEGORIE_COMMERCIAL,
+  type CategorieCommercial,
+} from "@/lib/types";
 
 const CHAMP = "h-11 rounded-xl border border-brand-line px-3 text-sm";
 
@@ -34,8 +41,10 @@ type Role = "coordinateur" | "fournisseur" | "livreur" | "commercial" | "technic
  * auto-inscription mais l'admin peut aussi en créer un directement — un mot
  * de passe est donc exigé pour ces rôles. Le Technicien est l'exception :
  * app Maintenancier = téléphone+OTP uniquement, donc ni e-mail ni mot de
- * passe ici, téléphone obligatoire à la place. CRUD complet côté admin,
- * comme pour un client.
+ * passe ici, téléphone obligatoire à la place. Même règle pour le
+ * Commercial (entité interne : son compte n'est créé que par l'Admin, avec
+ * son numéro), qui doit en plus être classé interne ou indépendant — ce
+ * choix fixe sa commission. CRUD complet côté admin, comme pour un client.
  */
 export function ModaleProvisionnerUtilisateur({
   role,
@@ -58,18 +67,22 @@ export function ModaleProvisionnerUtilisateur({
   const [zoneCouverture, setZoneCouverture] = useState("");
   const [localisation, setLocalisation] = useState("");
   const [specialite, setSpecialite] = useState("");
+  const [categorie, setCategorie] = useState<CategorieCommercial | null>(null);
   const [photo, setPhoto] = useState<File | null>(null);
   const [apercuPhoto, setApercuPhoto] = useState<string | null>(null);
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
   const inputPhotoRef = useRef<HTMLInputElement>(null);
 
-  // Technicien : connexion par téléphone+OTP uniquement (app Maintenancier),
-  // ni e-mail ni mot de passe — téléphone et spécialité exigés à la place.
+  // Technicien et Commercial : connexion par téléphone+OTP uniquement, ni
+  // e-mail ni mot de passe — téléphone exigé à la place.
   const estTechnicien = role === "technicien_maintenance";
+  const parTelephone = estTechnicien || role === "commercial";
   const pretAEnvoyer = Boolean(
     nom.trim() &&
-      (estTechnicien ? telephone.trim() && specialite.trim() : email.trim() && motDePasse.trim()) &&
+      (parTelephone ? telephone.trim() : email.trim() && motDePasse.trim()) &&
+      (!estTechnicien || specialite.trim()) &&
+      (role !== "commercial" || categorie) &&
       (role !== "fournisseur" || nomEntreprise.trim())
   );
 
@@ -90,13 +103,15 @@ export function ModaleProvisionnerUtilisateur({
       const champs: Record<string, string | null> = {
         nom,
         prenom: prenom || null,
-        email: estTechnicien ? null : email,
+        email: parTelephone ? null : email,
         telephone: telephone || null,
-        password: estTechnicien ? null : motDePasse,
+        password: parTelephone ? null : motDePasse,
         type_utilisateur: role,
         ...(role === "fournisseur" ? { nom_entreprise: nomEntreprise } : {}),
         ...(role === "livreur" ? { type_vehicule: typeVehicule || null, zone_couverture: zoneCouverture || null } : {}),
-        ...(role === "commercial" ? { nom_entreprise: nomEntreprise || null, localisation: localisation || null } : {}),
+        ...(role === "commercial"
+          ? { categorie_commercial: categorie, nom_entreprise: nomEntreprise || null, localisation: localisation || null }
+          : {}),
         ...(estTechnicien ? { specialite } : {}),
       };
 
@@ -130,8 +145,8 @@ export function ModaleProvisionnerUtilisateur({
         </div>
 
         <p className="mt-2 text-xs text-brand-muted">
-          {estTechnicien
-            ? "Compte créé directement par l'équipe — le technicien se connectera par téléphone + code reçu sur WhatsApp, aucun mot de passe."
+          {parTelephone
+            ? `Compte créé directement par l'équipe — le ${LIBELLE_ROLE[role]} se connectera avec ce numéro + code reçu sur WhatsApp, aucun mot de passe.`
             : `Compte créé directement par l'équipe — ${LIBELLE_ROLE[role]} pourra se connecter avec cet e-mail et ce mot de passe.`}
         </p>
 
@@ -168,14 +183,14 @@ export function ModaleProvisionnerUtilisateur({
             <input value={nom} onChange={(e) => setNom(e.target.value)} placeholder="Nom" className={CHAMP} />
             <input value={prenom} onChange={(e) => setPrenom(e.target.value)} placeholder="Prénom (optionnel)" className={CHAMP} />
           </div>
-          {estTechnicien ? null : <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" className={CHAMP} />}
+          {parTelephone ? null : <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="E-mail" className={CHAMP} />}
           <input
             value={telephone}
             onChange={(e) => setTelephone(e.target.value)}
-            placeholder={estTechnicien ? "Téléphone (WhatsApp, obligatoire)" : "Téléphone (optionnel)"}
+            placeholder={parTelephone ? "Téléphone (WhatsApp, obligatoire)" : "Téléphone (optionnel)"}
             className={CHAMP}
           />
-          {estTechnicien ? null : (
+          {parTelephone ? null : (
             <input
               type="password"
               value={motDePasse}
@@ -202,6 +217,30 @@ export function ModaleProvisionnerUtilisateur({
 
           {role === "commercial" ? (
             <>
+              <div className="flex flex-col gap-1.5">
+                <p className="text-xs font-medium text-brand-muted">Type de commercial</p>
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      ["interne", `${formaterPrix(COMMISSION_COMMERCIAL_INTERNE)} CFA par produit vendu`],
+                      ["independant", `${formaterPrix(COMMISSION_COMMERCIAL_INDEPENDANT_DEFAUT)} CFA par défaut, réglable par produit`],
+                    ] as const
+                  ).map(([valeur, commission]) => (
+                    <button
+                      key={valeur}
+                      type="button"
+                      onClick={() => setCategorie(valeur)}
+                      aria-pressed={categorie === valeur}
+                      className={`flex flex-col items-start gap-0.5 rounded-xl border px-3 py-2.5 text-left ${
+                        categorie === valeur ? "border-brand-blue-end bg-blue-50" : "border-brand-line"
+                      }`}
+                    >
+                      <span className="text-sm font-semibold text-brand-ink">{LIBELLE_CATEGORIE_COMMERCIAL[valeur]}</span>
+                      <span className="text-[11px] text-brand-muted">{commission}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
               <input value={nomEntreprise} onChange={(e) => setNomEntreprise(e.target.value)} placeholder="Nom de l'entreprise (optionnel)" className={CHAMP} />
               <input value={localisation} onChange={(e) => setLocalisation(e.target.value)} placeholder="Localisation (optionnel)" className={CHAMP} />
             </>

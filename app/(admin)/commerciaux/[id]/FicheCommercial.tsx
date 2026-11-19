@@ -7,8 +7,10 @@ import { ApiRequestError, apiFetch } from "@/lib/api";
 import {
   formaterDate,
   formaterPrix,
+  LIBELLE_CATEGORIE_COMMERCIAL,
   LIBELLE_STATUT_COMPTE,
   STYLE_STATUT_COMPTE,
+  type CategorieCommercial,
   type CommandeCommercialAdmin,
   type CommercialDetailAdmin,
   type Pagination,
@@ -39,9 +41,12 @@ export function FicheCommercial({ commercialId }: { commercialId: number }) {
 
   const [utilisateur, setUtilisateur] = useState<UtilisateurAdmin | null>(null);
   const [edition, setEdition] = useState(false);
-  const [brouillon, setBrouillon] = useState({ nom: "", prenom: "", email: "", telephone: "", nomEntreprise: "", localisation: "" });
+  const [brouillon, setBrouillon] = useState({
+    nom: "", prenom: "", email: "", telephone: "", nomEntreprise: "", localisation: "", categorie: "interne" as CategorieCommercial,
+  });
   const [enCours, setEnCours] = useState(false);
   const [erreur, setErreur] = useState<string | null>(null);
+  const [info, setInfo] = useState<string | null>(null);
 
   function charger() {
     if (!token) return;
@@ -54,7 +59,7 @@ export function FicheCommercial({ commercialId }: { commercialId: number }) {
         setUtilisateur(u);
         setBrouillon({
           nom: u.nom, prenom: u.prenom ?? "", email: u.email ?? "", telephone: u.telephone ?? "",
-          nomEntreprise: d.nom_entreprise ?? "", localisation: d.localisation ?? "",
+          nomEntreprise: d.nom_entreprise ?? "", localisation: d.localisation ?? "", categorie: d.categorie_commercial ?? "interne",
         });
         setErreur(null);
       })
@@ -81,12 +86,16 @@ export function FicheCommercial({ commercialId }: { commercialId: number }) {
       await apiFetch(`/admin/utilisateurs/${commercialId}`, {
         method: "PATCH",
         token,
-        body: { nom: brouillon.nom, prenom: brouillon.prenom || null, email: brouillon.email, telephone: brouillon.telephone || null },
+        body: { nom: brouillon.nom, prenom: brouillon.prenom || null, email: brouillon.email || null, telephone: brouillon.telephone || null },
       });
       await apiFetch(`/coordinateur/commerciaux/${commercialId}/profil`, {
         method: "PATCH",
         token,
-        body: { nom_entreprise: brouillon.nomEntreprise || null, localisation: brouillon.localisation || null },
+        body: {
+          nom_entreprise: brouillon.nomEntreprise || null,
+          localisation: brouillon.localisation || null,
+          categorie_commercial: brouillon.categorie,
+        },
       });
       setEdition(false);
       charger();
@@ -106,6 +115,27 @@ export function FicheCommercial({ commercialId }: { commercialId: number }) {
     try {
       await apiFetch(`/admin/utilisateurs/${commercialId}/statut`, { method: "PATCH", token, body: { statut_compte: nouveauStatut } });
       charger();
+    } finally {
+      setEnCours(false);
+    }
+  }
+
+  /** Le commercial n'a pas de bouton « Se déconnecter » dans son app : seul l'Admin ferme ses sessions. */
+  async function deconnecter() {
+    if (!token) return;
+    if (!confirm("Déconnecter ce commercial ? Il devra se reconnecter avec son numéro et le code reçu sur WhatsApp.")) return;
+
+    setErreur(null);
+    setInfo(null);
+    setEnCours(true);
+    try {
+      const { sessions_fermees } = await apiFetch<{ sessions_fermees: number }>(`/admin/utilisateurs/${commercialId}/deconnecter`, {
+        method: "POST",
+        token,
+      });
+      setInfo(sessions_fermees > 0 ? `Commercial déconnecté (${sessions_fermees} session${sessions_fermees > 1 ? "s" : ""} fermée${sessions_fermees > 1 ? "s" : ""}).` : "Ce commercial n'était connecté nulle part.");
+    } catch (e) {
+      setErreur(e instanceof ApiRequestError ? e.message : "Impossible de déconnecter ce commercial.");
     } finally {
       setEnCours(false);
     }
@@ -147,6 +177,7 @@ export function FicheCommercial({ commercialId }: { commercialId: number }) {
       />
 
       {erreur ? <p className="rounded-xl bg-rose-50 px-4 py-3 text-sm text-rose-600">{erreur}</p> : null}
+      {info ? <p className="rounded-xl bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{info}</p> : null}
 
       {detail && utilisateur ? (
         <div className="rounded-2xl border border-brand-line bg-white p-4">
@@ -155,6 +186,13 @@ export function FicheCommercial({ commercialId }: { commercialId: number }) {
               <p className="text-sm font-bold text-brand-ink">Informations</p>
               <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${STYLE_STATUT_COMPTE[utilisateur.statut_compte]}`}>
                 {LIBELLE_STATUT_COMPTE[utilisateur.statut_compte]}
+              </span>
+              <span
+                className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                  detail.categorie_commercial === "independant" ? "bg-violet-50 text-violet-600" : "bg-blue-50 text-blue-600"
+                }`}
+              >
+                {LIBELLE_CATEGORIE_COMMERCIAL[detail.categorie_commercial] ?? "Commercial"}
               </span>
             </div>
             <div className="flex gap-2">
@@ -170,6 +208,14 @@ export function FicheCommercial({ commercialId }: { commercialId: number }) {
                       Modifier
                     </button>
                   ) : null}
+                  <button
+                    type="button"
+                    onClick={deconnecter}
+                    disabled={enCours}
+                    className="h-9 rounded-full border border-brand-line px-3.5 text-xs font-semibold text-brand-ink disabled:opacity-50"
+                  >
+                    Déconnecter
+                  </button>
                   <button
                     type="button"
                     onClick={basculerStatut}
@@ -248,6 +294,19 @@ export function FicheCommercial({ commercialId }: { commercialId: number }) {
                   placeholder="Localisation"
                   className={CHAMP}
                 />
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium text-brand-muted">
+                  Type de commercial — le changement ne vaut que pour les ventes à venir
+                </label>
+                <select
+                  value={brouillon.categorie}
+                  onChange={(e) => setBrouillon((b) => ({ ...b, categorie: e.target.value as CategorieCommercial }))}
+                  className={CHAMP}
+                >
+                  <option value="interne">Commercial interne — 1 000 CFA par produit vendu</option>
+                  <option value="independant">Commercial indépendant — commission du produit (2 500 CFA par défaut)</option>
+                </select>
               </div>
               <div className="flex gap-2">
                 <button

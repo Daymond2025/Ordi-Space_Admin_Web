@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
-import { formaterPrix, type CommercialAdmin } from "@/lib/types";
+import { formaterPrix, LIBELLE_CATEGORIE_COMMERCIAL, type CommercialAdmin } from "@/lib/types";
 import { CommerciauxIcon, PlusIcon, SearchIcon } from "@/components/icons";
 import { PageHero } from "@/components/PageHero";
 import { ModaleProvisionnerUtilisateur } from "@/components/ModaleProvisionnerUtilisateur";
@@ -146,6 +146,13 @@ export default function CommerciauxListePage() {
                   {commercial.actif ? "Actif" : "Inactif"}
                 </span>
               </div>
+              <span
+                className={`w-fit rounded-full px-2 py-0.5 text-[10px] font-semibold ${
+                  commercial.categorie_commercial === "independant" ? "bg-violet-50 text-violet-600" : "bg-blue-50 text-blue-600"
+                }`}
+              >
+                {LIBELLE_CATEGORIE_COMMERCIAL[commercial.categorie_commercial] ?? "Commercial"}
+              </span>
               <div className="flex items-center justify-between text-xs text-brand-muted">
                 <span>{commercial.commandes_total} commandes</span>
                 <span>{formaterPrix(commercial.commission_totale)} CFA</span>
