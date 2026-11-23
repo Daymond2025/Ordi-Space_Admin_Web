@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch } from "@/lib/api";
 import { formaterDateHeure, LIEN_TYPE_NOTIFICATION, type NotificationAdmin, type Pagination } from "@/lib/types";
 import { BellIcon } from "./icons";
+import { useNotifications } from "@/components/notifications/Notifications";
 
 const INTERVALLE_RAFRAICHISSEMENT_MS = 30_000;
 
@@ -21,13 +22,14 @@ export function NotificationsBell() {
   const [notifications, setNotifications] = useState<NotificationAdmin[] | null>(null);
   const [ouvert, setOuvert] = useState(false);
   const conteneurRef = useRef<HTMLDivElement>(null);
+  const { version, marquerLue } = useNotifications();
 
   function charger() {
     if (!token) return;
     apiFetch<Pagination<NotificationAdmin>>("/moi/notifications?per_page=20", { token }).then((page) => setNotifications(page.data));
   }
 
-  useEffect(charger, [token]);
+  useEffect(charger, [token, version]);
 
   useEffect(() => {
     if (!token) return;
@@ -48,7 +50,7 @@ export function NotificationsBell() {
   async function ouvrir(notification: NotificationAdmin) {
     setOuvert(false);
     if (!notification.lu && token) {
-      apiFetch(`/moi/notifications/${notification.id}/lue`, { method: "PATCH", token }).catch(() => {});
+      marquerLue(notification.id).catch(() => {});
       setNotifications((liste) => liste?.map((n) => (n.id === notification.id ? { ...n, lu: true } : n)) ?? null);
     }
     const lien = LIEN_TYPE_NOTIFICATION[notification.type_notification];
