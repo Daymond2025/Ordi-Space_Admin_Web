@@ -97,7 +97,7 @@ export function ModaleAdministrateur({
             type="password"
             value={motDePasse}
             onChange={(e) => setMotDePasse(e.target.value)}
-            placeholder={edition ? "Nouveau mot de passe (laisser vide pour ne pas changer)" : "Mot de passe (8 car. min, majuscule + chiffre)"}
+            placeholder={edition ? "Nouveau mot de passe (laisser vide pour ne pas changer)" : "Mot de passe (8 car. min, majuscule, minuscule et chiffre)"}
             className={CHAMP}
           />
         </div>

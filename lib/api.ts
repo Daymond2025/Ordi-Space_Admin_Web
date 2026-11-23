@@ -16,7 +16,11 @@ export class ApiRequestError extends Error {
   status: number;
 
   constructor(error: ApiError, status: number) {
-    super(error.message);
+    // Erreur de validation : le message général seul (« données non
+    // valides ») ne dit pas quoi corriger — on y ajoute le détail par champ
+    // renvoyé par l'API, pour tous les formulaires d'un coup.
+    const details = error.fields ? Object.values(error.fields).flat().filter(Boolean) : [];
+    super(details.length ? `${error.message} ${details.join(" ")}` : error.message);
     this.code = error.code;
     this.fields = error.fields;
     this.status = status;

@@ -195,7 +195,7 @@ export function ModaleProvisionnerUtilisateur({
               type="password"
               value={motDePasse}
               onChange={(e) => setMotDePasse(e.target.value)}
-              placeholder="Mot de passe (8 car. min, majuscule + chiffre)"
+              placeholder="Mot de passe (8 car. min, majuscule, minuscule et chiffre)"
               className={CHAMP}
             />
           )}
