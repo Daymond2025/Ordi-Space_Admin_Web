@@ -124,7 +124,12 @@ export const SECTIONS_SECONDAIRES: Record<string, SectionSecondaire> = {
     titre: "Fournisseurs",
     rechercheLabel: "Recherche fournisseurs",
     racine: { label: "Liste des fournisseurs", href: "/fournisseurs" },
-    groupes: [],
+    groupes: [
+      {
+        label: "Outils",
+        elements: [{ label: "Contact du service", href: "/fournisseurs/contact" }],
+      },
+    ],
   },
   "/livreurs": {
     titre: "Livreurs",
