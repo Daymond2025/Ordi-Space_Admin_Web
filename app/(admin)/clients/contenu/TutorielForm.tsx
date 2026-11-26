@@ -8,6 +8,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import { extraireIdYoutube, LIBELLE_TYPE_TUTORIEL, type StatutTutoriel, type Tutoriel, type TypeTutoriel } from "@/lib/types";
 import { ChevronLeftIcon, GraduationCapIcon, ImagePlaceholderIcon, PlayIcon } from "@/components/icons";
 import { Listbox } from "@/components/Listbox";
+import { useRetour } from "@/lib/navigation";
 
 const OPTIONS_TYPE = Object.entries(LIBELLE_TYPE_TUTORIEL).map(([valeur, libelle]) => ({
   value: valeur,
@@ -27,6 +28,8 @@ function pageListe(type: TypeTutoriel): string {
 
 export function TutorielForm({ existant, typeParDefaut }: { existant?: Tutoriel; typeParDefaut?: TypeTutoriel }) {
   const router = useRouter();
+  // Retour fiable même si la page a été ouverte directement (notification, lien, appli rouverte) — voir lib/navigation.ts.
+  const retour = useRetour("/clients/contenu");
   const { token } = useAuth();
 
   const [titre, setTitre] = useState(existant?.titre ?? "");
@@ -87,7 +90,7 @@ export function TutorielForm({ existant, typeParDefaut }: { existant?: Tutoriel;
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-3">
-        <button type="button" onClick={() => router.back()} className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-brand-line">
+        <button type="button" onClick={retour} className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-brand-line">
           <ChevronLeftIcon className="h-5 w-5" />
         </button>
         <h1 className="text-2xl font-bold text-brand-ink">{existant ? "Modifier le contenu" : "Nouveau contenu"}</h1>

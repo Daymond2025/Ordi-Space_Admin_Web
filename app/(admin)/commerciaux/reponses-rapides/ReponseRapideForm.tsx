@@ -6,9 +6,12 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import type { ReponseRapide } from "@/lib/types";
 import { ChevronLeftIcon } from "@/components/icons";
+import { useRetour } from "@/lib/navigation";
 
 export function ReponseRapideForm({ existant }: { existant?: ReponseRapide }) {
   const router = useRouter();
+  // Retour fiable même si la page a été ouverte directement (notification, lien, appli rouverte) — voir lib/navigation.ts.
+  const retour = useRetour("/commerciaux/reponses-rapides");
   const { token } = useAuth();
 
   const [titre, setTitre] = useState(existant?.titre ?? "");
@@ -62,7 +65,7 @@ export function ReponseRapideForm({ existant }: { existant?: ReponseRapide }) {
       <div className="flex items-center gap-3">
         <button
           type="button"
-          onClick={() => router.back()}
+          onClick={retour}
           className="flex h-9 w-9 items-center justify-center rounded-full border border-brand-line bg-white"
         >
           <ChevronLeftIcon className="h-5 w-5" />

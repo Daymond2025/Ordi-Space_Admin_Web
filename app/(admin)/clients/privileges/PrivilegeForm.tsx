@@ -6,6 +6,7 @@ import { useAuth } from "@/context/AuthContext";
 import { apiFetch, ApiRequestError } from "@/lib/api";
 import { formaterPrix, LIBELLE_TYPE_PRIVILEGE, type Privilege, type TypePrivilege } from "@/lib/types";
 import { CashIcon, ChevronLeftIcon, GiftIconOutline, LivreursIcon, PercentIcon } from "@/components/icons";
+import { useRetour } from "@/lib/navigation";
 
 const CODE_REQUIS: TypePrivilege[] = ["remise_pourcentage", "remise_montant"];
 const VALEUR_REQUISE: TypePrivilege[] = ["remise_pourcentage", "remise_montant", "parrainage"];
@@ -27,6 +28,8 @@ const DEGRADES_PREDEFINIS: { debut: string; fin: string }[] = [
 
 export function PrivilegeForm({ existant }: { existant?: Privilege }) {
   const router = useRouter();
+  // Retour fiable même si la page a été ouverte directement (notification, lien, appli rouverte) — voir lib/navigation.ts.
+  const retour = useRetour("/clients/privileges");
   const { token } = useAuth();
 
   const [titre, setTitre] = useState(existant?.titre ?? "");
@@ -96,7 +99,7 @@ export function PrivilegeForm({ existant }: { existant?: Privilege }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-3">
-        <button type="button" onClick={() => router.back()} className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-brand-line">
+        <button type="button" onClick={retour} className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-brand-line">
           <ChevronLeftIcon className="h-5 w-5" />
         </button>
         <h1 className="text-2xl font-bold text-brand-ink">{existant ? "Modifier le privilège" : "Nouveau privilège"}</h1>

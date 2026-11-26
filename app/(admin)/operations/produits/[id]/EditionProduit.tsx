@@ -22,6 +22,7 @@ import {
   champsVersCorps,
   type ChampsBoutique,
 } from "@/components/ChampsBoutiqueProduit";
+import { useRetour } from "@/lib/navigation";
 
 const OPTIONS_LIVRAISON = [
   { value: "physique", label: "Physique" },
@@ -30,6 +31,8 @@ const OPTIONS_LIVRAISON = [
 
 export function EditionProduit({ id }: { id: string }) {
   const router = useRouter();
+  // Retour fiable même si la page a été ouverte directement (notification, lien, appli rouverte) — voir lib/navigation.ts.
+  const retour = useRetour("/operations/produits");
   const { token, user } = useAuth();
 
   const [produit, setProduit] = useState<Produit | null>(null);
@@ -184,7 +187,7 @@ export function EditionProduit({ id }: { id: string }) {
     <div className="flex flex-col gap-5">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <button type="button" onClick={() => router.back()} className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-brand-line">
+          <button type="button" onClick={retour} className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-brand-line">
             <ChevronLeftIcon className="h-5 w-5" />
           </button>
           <h1 className="text-2xl font-bold text-brand-ink">{produit.nom_produit}</h1>

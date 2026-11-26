@@ -4,6 +4,7 @@ import { AuthProvider } from "@/context/AuthContext";
 import { EnregistrementServiceWorker } from "@/components/EnregistrementServiceWorker";
 import { NotificationsAdmin } from "@/components/notifications/NotificationsAdmin";
 import "./globals.css";
+import { SuiviNavigation } from "@/lib/navigation";
 
 // Police par défaut de toutes les plateformes OrdiSpace (Admin/Fournisseur/
 // Coordinateur/Livreur/Client) : Roboto, repli Arial puis sans-serif.
@@ -27,6 +28,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="fr" className={`${roboto.variable} ${geistMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-background text-brand-ink">
+        <SuiviNavigation />
         <EnregistrementServiceWorker />
         <AuthProvider>
           <NotificationsAdmin>{children}</NotificationsAdmin>

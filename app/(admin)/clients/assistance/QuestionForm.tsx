@@ -7,6 +7,7 @@ import { apiFetch, ApiRequestError } from "@/lib/api";
 import type { QuestionFrequente, StatutQuestion } from "@/lib/types";
 import { ChevronLeftIcon, MicIcon } from "@/components/icons";
 import { Listbox } from "@/components/Listbox";
+import { useRetour } from "@/lib/navigation";
 
 const OPTIONS_STATUT = [
   { value: "brouillon", label: "Brouillon" },
@@ -15,6 +16,8 @@ const OPTIONS_STATUT = [
 
 export function QuestionForm({ existant }: { existant?: QuestionFrequente }) {
   const router = useRouter();
+  // Retour fiable même si la page a été ouverte directement (notification, lien, appli rouverte) — voir lib/navigation.ts.
+  const retour = useRetour("/clients/assistance");
   const { token } = useAuth();
 
   const [question, setQuestion] = useState(existant?.question ?? "");
@@ -77,7 +80,7 @@ export function QuestionForm({ existant }: { existant?: QuestionFrequente }) {
   return (
     <div className="flex flex-col gap-5">
       <div className="flex items-center gap-3">
-        <button type="button" onClick={() => router.back()} className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-brand-line">
+        <button type="button" onClick={retour} className="flex h-9 w-9 items-center justify-center rounded-full bg-white border border-brand-line">
           <ChevronLeftIcon className="h-5 w-5" />
         </button>
         <h1 className="text-2xl font-bold text-brand-ink">{existant ? "Modifier la question" : "Nouvelle question"}</h1>
